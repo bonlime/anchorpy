@@ -370,7 +370,7 @@ def _make_unnamed_field_record(
         ),
         init_element_for_from_json=_field_from_json(
             idl=idl,
-            ty=IdlField(str(index), docs=None, ty=unnamed_field),
+            ty=IdlField(str(index), docs=[], ty=unnamed_field),
             param_prefix=f"{cast_obj_var_name}[",
             param_suffix="]",
             types_relative_imports=True,

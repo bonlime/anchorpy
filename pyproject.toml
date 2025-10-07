@@ -15,7 +15,7 @@ dependencies = [
     "autoflake>=2.3.1",
     "black>=25.1.0",
     "genpy>=2022.1",
-    "anchorpy-idl",
+    "anchorpy-idl @ git+https://github.com/bonlime/anchorpy-idl.git@fix-init",
 ]
 #    "anchorpy-idl",
 name = "anchorpy"
@@ -145,10 +145,7 @@ exclude = [".venv"]
 
 [tool.rye]
 managed = true
-dev-dependencies = [
-    "pytest>=8.4.1",
-    "pytest-xprocess>=1.0.2",
-]
+dev-dependencies = ["pytest>=8.4.1", "pytest-xprocess>=1.0.2"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -157,6 +154,3 @@ allow-direct-references = true
 asyncio_mode = "auto"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
-
-
-
