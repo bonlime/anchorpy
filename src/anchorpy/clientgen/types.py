@@ -203,7 +203,7 @@ def gen_types_code(
                 ty.name,
                 _py_type_from_idl(
                     idl,
-                    ty_type.value,
+                    ty_type.alias,
                     types_relative_imports=True,
                     use_fields_interface_for_struct=False,
                 ),
@@ -212,7 +212,7 @@ def gen_types_code(
             body = gen_struct(
                 idl,
                 ty_name,
-                ty_type.fields.fields,
+                ty_type.fields.fields if ty_type.fields else [],
                 base_class=base_class,
                 discriminator_literal=discriminator_literal,
             )

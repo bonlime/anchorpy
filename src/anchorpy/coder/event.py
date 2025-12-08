@@ -1,15 +1,13 @@
 """This module deals with (de)serializing Anchor events."""
+
 from hashlib import sha256
 from typing import Any, Dict, Optional, Tuple
-#,evaluate_forward_ref
-#from typing_extensions import evaluate_forward_ref
 
 from anchorpy_idl import (
     Idl,
     IdlEvent,
 )
 from construct import Adapter, Bytes, Construct, Sequence, Switch
-from pyheck import snake
 
 from anchorpy.coder.idl import _typedef_layout, find_type_by_name
 from anchorpy.program.common import Event

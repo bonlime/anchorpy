@@ -46,7 +46,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anchorpy-idl", directory = "../anchorpy-idl-bonlime" },
+    { name = "anchorpy-idl", git = "https://github.com/bonlime/anchorpy-idl.git?rev=fix-init" },
     { name = "based58", specifier = ">=0.1.1,<0.2" },
     { name = "borsh-construct", specifier = ">=0.1.0,<0.2" },
     { name = "construct-typing", specifier = ">=0.5.1,<0.7" },
@@ -81,13 +81,10 @@ dev = [
 [[package]]
 name = "anchorpy-idl"
 version = "0.1.0"
-source = { directory = "../anchorpy-idl-bonlime" }
+source = { git = "https://github.com/bonlime/anchorpy-idl.git?rev=fix-init#89b2ec06fb976ca873bc9a0e28fc902d44c75505" }
 dependencies = [
     { name = "jsonalias" },
 ]
-
-[package.metadata]
-requires-dist = [{ name = "jsonalias", specifier = "==0.1.1" }]
 
 [[package]]
 name = "anyio"
