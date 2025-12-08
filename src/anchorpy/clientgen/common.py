@@ -1,6 +1,6 @@
 """Code generation utilities."""
 import keyword
-from typing import Optional
+from typing import Optional, Sequence
 
 from anchorpy_idl import (
     Idl,
@@ -35,6 +35,11 @@ INT_TYPES = {
 }
 FLOAT_TYPES = {IdlTypeSimple.F32, IdlTypeSimple.F64}
 NUMBER_TYPES = INT_TYPES | FLOAT_TYPES
+
+
+def _bytes_literal(data: Sequence[int] | bytes) -> str:
+    """Render a byte sequence as a Python bytes literal."""
+    return repr(bytes(data))
 
 
 def _fields_interface_name(type_name: str) -> str:
@@ -78,7 +83,7 @@ def _py_type_from_idl(
             types_relative_imports=types_relative_imports,
             use_fields_interface_for_struct=use_fields_interface_for_struct,
         )
-        return f"typing.Optional[{inner_type}]"
+        return f"{inner_type} | None"
     if isinstance(ty, IdlTypeDefined):
 
         defined = _sanitize(ty.name)
@@ -86,7 +91,7 @@ def _py_type_from_idl(
         maybe_coption_split = defined.split("COption<")
         if len(maybe_coption_split) == 2:
             inner_type = {"u64": "int", "Pubkey": "Pubkey"}[maybe_coption_split[1][:-1]]
-            return f"typing.Optional[{inner_type}]"
+            return f"{inner_type} | None"
         if defined == "&'astr":
             return "str"
         defined_types_prefix = (
@@ -213,7 +218,7 @@ def _field_to_encodable(
         # skip mapping when not needed
         if map_body == "item":
             return f"{val_prefix}{ty_name}{val_suffix}"
-        return f"list(map(lambda item: {map_body}, {val_prefix}{ty_name}{val_suffix}))"
+        return f"[{map_body} for item in {val_prefix}{ty_name}{val_suffix}]"
     if isinstance(ty_type, IdlTypeOption):
         encodable = _field_to_encodable(
             idl=idl,
@@ -272,7 +277,7 @@ def _field_to_encodable(
         # skip mapping when not needed
         if map_body == "item":
             return f"{val_prefix}{ty_name}{val_suffix}"
-        return f"list(map(lambda item: {map_body}, {val_prefix}{ty_name}{val_suffix}))"
+        return f"[{map_body} for item in {val_prefix}{ty_name}{val_suffix}]"
     if ty_type in {
         IdlTypeSimple.Bool,
         *NUMBER_TYPES,
@@ -299,7 +304,7 @@ def _field_from_decoded(
         # skip mapping when not needed
         if map_body == "item":
             return f"{val_prefix}{ty_name}"
-        return f"list(map(lambda item: {map_body}, {val_prefix}{ty_name}))"
+        return f"[{map_body} for item in {val_prefix}{ty_name}]"
     if isinstance(ty_type, IdlTypeOption):
         decoded = _field_from_decoded(
             idl=idl,
@@ -357,7 +362,7 @@ def _field_from_decoded(
         # skip mapping when not needed
         if map_body == "item":
             return f"{val_prefix}{ty_name}"
-        return f"list(map(lambda item: {map_body}, {val_prefix}{ty_name}))"
+        return f"[{map_body} for item in {val_prefix}{ty_name}]"
     if ty_type in {
         IdlTypeSimple.Bool,
         *NUMBER_TYPES,
@@ -415,7 +420,7 @@ def _struct_field_initializer(
         # skip mapping when not needed
         if map_body == "item":
             return f"{prefix}{field_name}{suffix}"
-        return f"list(map(lambda item: {map_body}, {prefix}{field_name}{suffix}))"
+        return f"[{map_body} for item in {prefix}{field_name}{suffix}]"
     if isinstance(field_type, IdlTypeVec):
         map_body = _struct_field_initializer(
             idl=idl,
@@ -427,7 +432,7 @@ def _struct_field_initializer(
         # skip mapping when not needed
         if map_body == "item":
             return f"{prefix}{field_name}{suffix}"
-        return f"list(map(lambda item: {map_body}, {prefix}{field_name}{suffix}))"
+        return f"[{map_body} for item in {prefix}{field_name}{suffix}]"
     if field_type in {
         IdlTypeSimple.Bool,
         *NUMBER_TYPES,
@@ -456,13 +461,13 @@ def _field_to_json(
         # skip mapping when not needed
         if map_body == "item":
             return var_name
-        return f"list(map(lambda item: {map_body}, {var_name}))"
+        return f"[{map_body} for item in {var_name}]"
     if isinstance(ty_type, IdlTypeArray):
         map_body = _field_to_json(idl, IdlField("item", docs=[], ty=ty_type.array[0]))
         # skip mapping when not needed
         if map_body == "item":
             return var_name
-        return f"list(map(lambda item: {map_body}, {var_name}))"
+        return f"[{map_body} for item in {var_name}]"
     if isinstance(ty_type, IdlTypeOption):
         value = _field_to_json(
             idl,
@@ -527,13 +532,13 @@ def _idl_type_to_json_type(ty: IdlType, types_relative_imports: bool) -> str:
         inner = _idl_type_to_json_type(
             ty=ty.option, types_relative_imports=types_relative_imports
         )
-        return f"typing.Optional[{inner}]"
+        return f"{inner} | None"
     if isinstance(ty, IdlTypeDefined):
         defined = ty.name
         maybe_coption_split = defined.split("COption<")
         if len(maybe_coption_split) == 2:
             inner_type = {"u64": "int", "Pubkey": "str"}[maybe_coption_split[1][:-1]]
-            return f"typing.Optional[{inner_type}]"
+            return f"{inner_type} | None"
         defined_types_prefix = (
             "" if types_relative_imports else _DEFAULT_DEFINED_TYPES_PREFIX
         )
@@ -576,7 +581,7 @@ def _field_from_json(
         # skip mapping when not needed
         if map_body == "item":
             return var_name
-        return f"list(map(lambda item: {map_body}, {var_name}))"
+        return f"[{map_body} for item in {var_name}]"
     if isinstance(ty_type, IdlTypeArray):
         map_body = _field_from_json(
             idl=idl,
@@ -588,7 +593,7 @@ def _field_from_json(
         # skip mapping when not needed
         if map_body == "item":
             return var_name
-        return f"list(map(lambda item: {map_body}, {var_name}))"
+        return f"[{map_body} for item in {var_name}]"
     if isinstance(ty_type, IdlTypeOption):
         inner = _field_from_json(
             idl=idl,

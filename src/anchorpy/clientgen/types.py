@@ -10,12 +10,10 @@ from anchorpy_idl import (
     IdlType,
     IdlTypeDefAlias,
     IdlTypeDefStruct,
-    #IdlTypeDefinitionTyAlias,
-    #IdlTypeDefinitionTyStruct,
+    # IdlTypeDefinitionTyAlias,
+    # IdlTypeDefinitionTyStruct,
 )
-from autoflake import fix_code
-from black import FileMode, format_str
-from genpy import (
+from anchorpy.clientgen.genpy import (
     Assign,
     Collection,
     FromImport,
@@ -27,9 +25,10 @@ from genpy import (
     Return,
     Suite,
 )
-from pyheck import snake
+from pyheck import snake, upper_camel
 
 from anchorpy.clientgen.common import (
+    _bytes_literal,
     _field_from_decoded,
     _field_from_json,
     _field_to_encodable,
@@ -45,6 +44,7 @@ from anchorpy.clientgen.common import (
 from anchorpy.clientgen.genpy_extension import (
     ANNOTATIONS_IMPORT,
     Call,
+    Class,
     ClassMethod,
     Dataclass,
     Function,
@@ -60,29 +60,55 @@ from anchorpy.clientgen.genpy_extension import (
 )
 
 
+def _collect_discriminators(idl: Idl, attr: str) -> dict[str, str]:
+    items = getattr(idl, attr, None) or []
+    res: dict[str, str] = {}
+    for item in items:
+        discriminator = getattr(item, "discriminator", None)
+        if discriminator is None:
+            continue
+        res[_sanitize(item.name)] = _bytes_literal(discriminator)
+    return res
+
+
 def gen_types(idl: Idl, root: Path) -> None:
     types = idl.types
     if types is None or not types:
         return
+    account_discriminators = _collect_discriminators(idl, "accounts")
+    event_discriminators = _collect_discriminators(idl, "events")
     types_dir = root / "types"
     types_dir.mkdir(exist_ok=True)
-    gen_index_file(idl, types_dir)
-    gen_type_files(idl, types_dir)
+    gen_index_file(idl, types_dir, account_discriminators, event_discriminators)
+    gen_type_files(idl, types_dir, account_discriminators, event_discriminators)
 
 
-def gen_index_file(idl: Idl, types_dir: Path) -> None:
-    code = gen_index_code(idl)
+def gen_index_file(
+    idl: Idl,
+    types_dir: Path,
+    account_discriminators: dict[str, str],
+    event_discriminators: dict[str, str],
+) -> None:
+    code = gen_index_code(idl, account_discriminators, event_discriminators)
     path = types_dir / "__init__.py"
-    formatted = format_str(code, mode=FileMode())
-    path.write_text(formatted)
+    path.write_text(code)
 
 
-def gen_index_code(idl: Idl) -> str:
-    imports: list[TypingUnion[Import, FromImport]] = [Import("typing")]
+def gen_index_code(
+    idl: Idl,
+    account_discriminators: dict[str, str],
+    event_discriminators: dict[str, str],
+) -> str:
+    imports: list[TypingUnion[Import, FromImport]] = []
+    program_name = _sanitize(upper_camel(getattr(idl.metadata, "name", "Program")))
+    account_type_alias = f"{program_name}AccountsType"
+    event_type_alias = f"{program_name}EventsType"
+    account_types: list[str] = []
+    event_types: list[str] = []
+    imports.append(FromImport(".", [_sanitize(snake(ty.name)) for ty in idl.types]))
     for ty in idl.types:
         ty_type = ty.ty
         module_name = _sanitize(snake(ty.name))
-        imports.append(FromImport(".", [module_name]))
         if isinstance(ty_type, IdlTypeDefStruct):
             import_members = [_sanitize(ty.name), _json_interface_name(ty.name)]
         elif isinstance(ty_type, IdlTypeDefAlias):
@@ -98,23 +124,73 @@ def gen_index_code(idl: Idl) -> str:
                 import_members,
             )
         )
-    return str(Collection(imports))
+        sanitized_name = _sanitize(ty.name)
+        if sanitized_name in account_discriminators:
+            account_types.append(sanitized_name)
+        if sanitized_name in event_discriminators:
+            event_types.append(sanitized_name)
+    sections = [str(Collection(imports))]
+    if account_types:
+        account_union_members = " | \n    ".join(
+            f"type[{account}]" for account in account_types
+        )
+        sections.append(f"{account_type_alias} = (\n    {account_union_members}\n)")
+        account_list_members = ",\n    ".join(account_types)
+        sections.append(
+            f"accounts: list[{account_type_alias}] = [\n    {account_list_members},\n]"
+        )
+        sections.append(
+            f"ACCOUNT_MAP: dict[bytes, {account_type_alias}] = "
+            "{acc.discriminator: acc for acc in accounts}"
+        )
+    if event_types:
+        event_union_members = " | \n    ".join(
+            f"type[{event}]" for event in event_types
+        )
+        sections.append(f"{event_type_alias} = (\n    {event_union_members}\n)")
+        event_list_members = ",\n    ".join(event_types)
+        sections.append(
+            f"events: list[{event_type_alias}] = [\n    {event_list_members},\n]"
+        )
+        sections.append(
+            f"EVENT_MAP: dict[bytes, {event_type_alias}] = "
+            "{event.discriminator: event for event in events}"
+        )
+    return "\n\n".join(sections)
 
 
-def gen_type_files(idl: Idl, types_dir: Path) -> None:
-    types_code = gen_types_code(idl, types_dir)
+def gen_type_files(
+    idl: Idl,
+    types_dir: Path,
+    account_discriminators: dict[str, str],
+    event_discriminators: dict[str, str],
+) -> None:
+    types_code = gen_types_code(
+        idl, types_dir, account_discriminators, event_discriminators
+    )
     for path, code in types_code.items():
-        formatted = format_str(code, mode=FileMode())
-        fixed = fix_code(formatted, remove_all_unused_imports=True)
-        path.write_text(fixed)
+        path.write_text(code)
 
 
-def gen_types_code(idl: Idl, out: Path) -> dict[Path, str]:
+def gen_types_code(
+    idl: Idl,
+    out: Path,
+    account_discriminators: dict[str, str],
+    event_discriminators: dict[str, str],
+) -> dict[Path, str]:
     res = {}
     types_module_names = [_sanitize(snake(ty.name)) for ty in idl.types]
     for ty in idl.types:
         ty_name = _sanitize(ty.name)
         module_name = _sanitize(snake(ty.name))
+        base_class = None
+        discriminator_literal = None
+        if ty_name in account_discriminators:
+            base_class = "AccountData"
+            discriminator_literal = account_discriminators[ty_name]
+        elif ty_name in event_discriminators:
+            base_class = "EventData"
+            discriminator_literal = event_discriminators[ty_name]
         relative_import_items = [
             mod for mod in types_module_names if mod != module_name
         ]
@@ -133,7 +209,13 @@ def gen_types_code(idl: Idl, out: Path) -> dict[Path, str]:
                 ),
             )
         elif isinstance(ty_type, IdlTypeDefStruct):
-            body = gen_struct(idl, ty_name, ty_type.fields.fields)
+            body = gen_struct(
+                idl,
+                ty_name,
+                ty_type.fields.fields,
+                base_class=base_class,
+                discriminator_literal=discriminator_literal,
+            )
         else:
             body = gen_enum(idl, ty_name, ty_type.variants)
         code = str(Collection([ANNOTATIONS_IMPORT, *relative_import_container, body]))
@@ -142,7 +224,13 @@ def gen_types_code(idl: Idl, out: Path) -> dict[Path, str]:
     return res
 
 
-def gen_struct(idl: Idl, name: str, fields: list[IdlField]) -> Collection:
+def gen_struct(
+    idl: Idl,
+    name: str,
+    fields: list[IdlField],
+    base_class: str | None = None,
+    discriminator_literal: str | None = None,
+) -> Collection:
     imports = [
         Import("typing"),
         FromImport("dataclasses", ["dataclass"]),
@@ -151,6 +239,8 @@ def gen_struct(idl: Idl, name: str, fields: list[IdlField]) -> Collection:
         FromImport("anchorpy.borsh_extension", ["BorshPubkey"]),
         ImportAs("borsh_construct", "borsh"),
     ]
+    if base_class is not None:
+        imports.append(FromImport("..base", [base_class]))
     json_interface_name = _json_interface_name(name)
     field_params: list[TypedParam] = []
     json_interface_params: list[TypedParam] = []
@@ -205,36 +295,57 @@ def gen_struct(idl: Idl, name: str, fields: list[IdlField]) -> Collection:
         from_json_items.append(f"{field_name}={field_from_json}")
     json_interface = TypedDict(json_interface_name, json_interface_params)
     layout = f"borsh.CStruct({','.join(layout_items)})"
+    layout_expr = f"{layout}.compile()"
     args_for_from_decoded = ",".join(from_decoded_items)
     to_encodable_body = "{" + ",".join(to_encodable_items) + "}"
     to_json_body = "{" + ",".join(to_json_items) + "}"
     args_for_from_json = ",".join(from_json_items)
-    struct_cls = Dataclass(
-        name,
-        [
-            Assign("layout: typing.ClassVar", layout),
-            *field_params,
-            ClassMethod(
-                "from_decoded",
-                [TypedParam("obj", "Container")],
-                Return(f"cls({args_for_from_decoded})"),
-                f'"{name}"',
-            ),
-            Method(
-                "to_encodable",
-                [],
-                Return(to_encodable_body),
-                "dict[str, typing.Any]",
-            ),
-            Method("to_json", [], Return(to_json_body), json_interface_name),
-            ClassMethod(
-                "from_json",
-                [TypedParam("obj", json_interface_name)],
-                Return(f"cls({args_for_from_json})"),
-                f'"{name}"',
-            ),
-        ],
+    discriminator_assignment = (
+        [Assign("discriminator: typing.ClassVar", discriminator_literal)]
+        if discriminator_literal
+        else []
     )
+    decode_method = (
+        [
+            ClassMethod(
+                "decode",
+                [TypedParam("data", "bytes")],
+                Return("super().decode(data)"),
+                f'"{name}"',
+            )
+        ]
+        if base_class
+        else []
+    )
+    attributes = [
+        *discriminator_assignment,
+        Assign("layout: typing.ClassVar", layout_expr),
+        *field_params,
+        ClassMethod(
+            "from_decoded",
+            [TypedParam("obj", "Container")],
+            Return(f"cls({args_for_from_decoded})"),
+            f'"{name}"',
+        ),
+        Method(
+            "to_encodable",
+            [],
+            Return(to_encodable_body),
+            "dict[str, typing.Any]",
+        ),
+        Method("to_json", [], Return(to_json_body), json_interface_name),
+        ClassMethod(
+            "from_json",
+            [TypedParam("obj", json_interface_name)],
+            Return(f"cls({args_for_from_json})"),
+            f'"{name}"',
+        ),
+        *decode_method,
+    ]
+    if base_class:
+        struct_cls = Class(name, [base_class], attributes)
+    else:
+        struct_cls = Dataclass(name, attributes, None)
     return Collection([*imports, json_interface, struct_cls])
 
 

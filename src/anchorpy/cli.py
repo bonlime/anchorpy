@@ -1,17 +1,16 @@
 import os
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, cast
 
 import typer
 from anchorpy_idl import Idl
-from IPython import embed
 
 from anchorpy import create_workspace
-from anchorpy.clientgen.accounts import gen_accounts
 from anchorpy.clientgen.errors import gen_errors
 from anchorpy.clientgen.instructions import gen_instructions
-from anchorpy.clientgen.program_id import gen_program_id
+from anchorpy.clientgen.root_files import gen_base, gen_constants
 from anchorpy.clientgen.types import gen_types
 from anchorpy.template import INIT_TESTS
 
@@ -66,6 +65,14 @@ def shell():
 
     Note that you should run `anchor localnet` before `anchorpy shell`.
     """
+    try:
+        from IPython import embed
+    except ImportError as exc:
+        raise ImportError(
+            "IPython is required for `anchorpy shell`. Install with "
+            "`pip install anchorpy[cli]`."
+        ) from exc
+
     path = _search_upwards_for_project_root()
     workspace = create_workspace(path)  # noqa: F841
     embed(
@@ -108,35 +115,61 @@ def client_gen(
     """Generate Python client code from the specified anchor IDL."""
 
     idl_obj = Idl.from_json(idl.read_text())
+    idl_address = getattr(idl_obj, "address", None)
     if program_id is None:
         idl_metadata = idl_obj.metadata
         address_from_idl = (
             idl_metadata["address"] if isinstance(idl_metadata, dict) else None
         )
-        if address_from_idl is None:
+        if idl_address is None and address_from_idl is None:
             typer.echo(
                 "No program ID found in IDL. Use the --program-id "
                 "option to set it manually."
             )
             raise typer.Exit(code=1)
         else:
-            program_id_to_use = cast(str, address_from_idl)
+            program_id_to_use = cast(str, idl_address or address_from_idl)
     else:
         program_id_to_use = program_id
 
     typer.echo("generating package...")
     out.mkdir(exist_ok=True)
     (out / "__init__.py").touch()
-    typer.echo("generating program_id.py...")
-    gen_program_id(program_id_to_use, out)
+    typer.echo("generating base classes...")
+    gen_base(out)
+    typer.echo("generating constants.py...")
+    gen_constants(idl_obj, program_id_to_use, out)
     typer.echo("generating errors.py...")
     gen_errors(idl_obj, out)
-    typer.echo("generating instructions...")
-    gen_instructions(idl_obj, out, pdas)
     typer.echo("generating types...")
     gen_types(idl_obj, out)
-    typer.echo("generating accounts...")
-    gen_accounts(idl_obj, out)
+    typer.echo("generating instructions...")
+    gen_instructions(idl_obj, out, pdas)
+    ruff_commands = [
+        ["uv", "run", "ruff", "format", "--silent", str(out)],
+        [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            str(out),
+            "--fix",
+            "--unsafe-fixes",
+            "--silent",
+            "--exit-zero",
+        ],
+    ]
+    for cmd in ruff_commands:
+        typer.echo(f"running ruff {' '.join(cmd)}")
+        try:
+            subprocess.run(cmd, check=True)
+        except FileNotFoundError:
+            typer.echo(
+                "ruff not found; skipping formatting. Install ruff to enable it."
+            )
+        except subprocess.CalledProcessError as err:
+            typer.echo(f"ruff command failed ({' '.join(cmd)}): {err}")
+            raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

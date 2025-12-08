@@ -1,7 +1,6 @@
 from pathlib import Path
 
-from black import FileMode, format_str
-from genpy import Assign, Collection, FromImport
+from anchorpy.clientgen.genpy import Assign, Collection, FromImport
 
 
 def gen_program_id_code(program_id: str) -> str:
@@ -12,5 +11,4 @@ def gen_program_id_code(program_id: str) -> str:
 
 def gen_program_id(program_id: str, root: Path) -> None:
     code = gen_program_id_code(program_id)
-    formatted = format_str(code, mode=FileMode())
-    (root / "program_id.py").write_text(formatted)
+    (root / "program_id.py").write_text(code)

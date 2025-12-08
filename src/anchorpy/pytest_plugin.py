@@ -1,10 +1,12 @@
 """This module provides the `localnet_fixture` fixture factory."""
 import os
+import shutil
 import signal
 import subprocess
 from pathlib import Path
 from typing import AsyncGenerator, Callable, Literal, Optional, Union
 
+import pytest
 from pytest import fixture
 from pytest_asyncio import fixture as async_fixture
 from xprocess.pytest_xprocess import getrootdir
@@ -173,6 +175,8 @@ def localnet_fixture(
             # command to start process
 
         actual_build_cmd = "anchor build" if build_cmd is None else build_cmd
+        if build_cmd is None and shutil.which("anchor") is None:
+            pytest.skip("anchor binary not found; install Anchor to run localnet tests")
         subprocess.run(actual_build_cmd, cwd=path, check=True, shell=True)
         # ensure process is running and return its logfile
         logfile = _fixed_xprocess.ensure("localnet", Starter)
@@ -226,6 +230,8 @@ def workspace_fixture(
             # command to start process
 
         actual_build_cmd = "anchor build" if build_cmd is None else build_cmd
+        if build_cmd is None and shutil.which("anchor") is None:
+            pytest.skip("anchor binary not found; install Anchor to run localnet tests")
         subprocess.run(actual_build_cmd, cwd=path, check=True, shell=True)
         # ensure process is running
         _ = _fixed_xprocess.ensure("localnet", Starter)

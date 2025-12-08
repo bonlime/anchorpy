@@ -3,7 +3,7 @@ from pathlib import Path
 from anchorpy import Idl
 from anchorpy.clientgen.instructions import gen_accounts
 from anchorpy.clientgen.types import gen_struct
-from genpy import Suite
+from anchorpy.clientgen.genpy import Suite
 
 
 def test_gen_accounts() -> None:
@@ -41,9 +41,9 @@ def test_empty_fields() -> None:
         "\nimport borsh_construct as borsh"
         "\nclass AggregatorLockParamsJSON(typing.TypedDict):"
         "\n    pass"
-        "\n@dataclass"
+        "\n@dataclass(slots=True)"
         "\nclass AggregatorLockParams():"
-        "\n    layout: typing.ClassVar = borsh.CStruct()"
+        "\n    layout: typing.ClassVar = borsh.CStruct().compile()"
         "\n    @classmethod"
         '\n    def from_decoded(cls, obj: Container) -> "AggregatorLockParams":'
         "\n        return cls()"

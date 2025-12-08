@@ -6,11 +6,9 @@ from anchorpy_idl import (
     IdlField,
     IdlTypeDef,
     IdlTypeDefStruct,
-    #IdlTypeDefTyStruct,
+    # IdlTypeDefTyStruct,
 )
-from autoflake import fix_code
-from black import FileMode, format_str
-from genpy import (
+from anchorpy.clientgen.genpy import (
     Assign,
     Collection,
     For,
@@ -60,15 +58,12 @@ def gen_accounts(idl: Idl, root: Path) -> None:
     gen_index_file(idl, accounts_dir)
     accounts_dict = gen_accounts_code(idl, accounts_dir)
     for path, code in accounts_dict.items():
-        formatted = format_str(code, mode=FileMode())
-        fixed = fix_code(formatted, remove_all_unused_imports=True)
-        path.write_text(fixed)
+        path.write_text(code)
 
 
 def gen_index_file(idl: Idl, accounts_dir: Path) -> None:
     code = gen_index_code(idl)
-    formatted = format_str(code, mode=FileMode())
-    (accounts_dir / "__init__.py").write_text(formatted)
+    (accounts_dir / "__init__.py").write_text(code)
 
 
 def gen_index_code(idl: Idl) -> str:
@@ -109,14 +104,14 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
         FromImport(
             "anchorpy.borsh_extension", ["BorshPubkey", "EnumForCodegen", "COption"]
         ),
-        FromImport("..program_id", ["PROGRAM_ID"]),
+        FromImport("..constants", ["PROGRAM_ID"]),
     ]
     imports = (
         [*base_imports, FromImport("..", ["types"])] if idl.types else base_imports
     )
     fields_interface_params: list[TypedParam] = []
     json_interface_params: list[TypedParam] = []
-    accType = find_type_by_name(acc.name,idl.types)
+    accType = find_type_by_name(acc.name, idl.types)
 
     ty = cast(IdlTypeDefStruct, accType.ty)
     fields = ty.fields.fields
@@ -179,14 +174,15 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
         "discriminator: typing.ClassVar", _account_discriminator(name)
     )
     layout_assignment = Assign(
-        "layout: typing.ClassVar", f"borsh.CStruct({','.join(layout_items)})"
+        "layout: typing.ClassVar",
+        f"borsh.CStruct({','.join(layout_items)}).compile()",
     )
     fetch_method = ClassMethod(
         "fetch",
         [
             TypedParam("conn", "AsyncClient"),
             TypedParam("address", "Pubkey"),
-            TypedParam("commitment", "typing.Optional[Commitment] = None"),
+            TypedParam("commitment", "Commitment | None = None"),
             TypedParam("program_id", "Pubkey = PROGRAM_ID"),
         ],
         Suite(
@@ -205,19 +201,19 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
                 Return("cls.decode(bytes_data)"),
             ]
         ),
-        f'typing.Optional["{name}"]',
+        f'"{name}" | None',
         is_async=True,
     )
     account_does_not_belong_raise = Raise(
         'ValueError("Account does not belong to this program")'
     )
-    fetch_multiple_return_type = f'typing.List[typing.Optional["{name}"]]'
+    fetch_multiple_return_type = f'list["{name}" | None]'
     fetch_multiple_method = ClassMethod(
         "fetch_multiple",
         [
             TypedParam("conn", "AsyncClient"),
             TypedParam("addresses", "list[Pubkey]"),
-            TypedParam("commitment", "typing.Optional[Commitment] = None"),
+            TypedParam("commitment", "Commitment | None = None"),
             TypedParam("program_id", "Pubkey = PROGRAM_ID"),
         ],
         Suite(
@@ -250,7 +246,7 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
                 Return("res"),
             ]
         ),
-        f'typing.List[typing.Optional["{name}"]]',
+        f'list["{name}" | None]',
         is_async=True,
     )
     decode_body_end = Call("cls", decode_body_entries)

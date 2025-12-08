@@ -1,9 +1,7 @@
 from pathlib import Path
 
 from anchorpy_idl import Idl, IdlErrorCode
-from autoflake import fix_code
-from black import FileMode, format_str
-from genpy import (
+from anchorpy.clientgen.genpy import (
     Assign,
     Collection,
     FromImport,
@@ -13,7 +11,7 @@ from genpy import (
     Statement,
     Suite,
 )
-from genpy import Function as UntypedFunction
+from anchorpy.clientgen.genpy import Function as UntypedFunction
 
 from anchorpy.clientgen.common import _sanitize
 from anchorpy.clientgen.genpy_extension import (
@@ -37,7 +35,7 @@ def gen_from_code_fn(has_custom_errors: bool) -> Function:
     from_code_return_type = (
         Union(["custom.CustomError", "anchor.AnchorError", "None"])
         if has_custom_errors
-        else "typing.Optional[anchor.AnchorError]"
+        else "anchor.AnchorError | None"
     )
     return Function(
         "from_code",
@@ -63,7 +61,7 @@ def gen_from_tx_error_fn(has_custom_errors: bool) -> Function:
     return_type = (
         "typing.Union[anchor.AnchorError, custom.CustomError, None]"
         if has_custom_errors
-        else "typing.Optional[anchor.AnchorError]"
+        else "anchor.AnchorError | None"
     )
     return Function(
         "from_tx_error",
@@ -112,7 +110,7 @@ def gen_custom_errors_code(errors: list[IdlErrorCode]) -> str:
         "from_code",
         [TypedParam("code", "int")],
         from_code_body,
-        "typing.Optional[CustomError]",
+        "CustomError | None",
     )
     return str(
         Collection(
@@ -126,9 +124,7 @@ def gen_custom_errors(idl: Idl, errors_dir: Path) -> None:
     if errors is None or not errors:
         return
     code = gen_custom_errors_code(errors)
-    formatted = format_str(code, mode=FileMode())
-    fixed = fix_code(formatted, remove_all_unused_imports=True)
-    (errors_dir / "custom.py").with_suffix(".py").write_text(fixed)
+    (errors_dir / "custom.py").with_suffix(".py").write_text(code)
 
 
 def gen_anchor_errors_code() -> str:
@@ -169,7 +165,7 @@ def gen_anchor_errors_code() -> str:
         "from_code",
         [TypedParam("code", "int")],
         from_code_body,
-        "typing.Optional[AnchorError]",
+        "AnchorError | None",
     )
     return str(
         Collection(
@@ -180,8 +176,7 @@ def gen_anchor_errors_code() -> str:
 
 def gen_anchor_errors(errors_dir: Path) -> None:
     code = gen_anchor_errors_code()
-    formatted = format_str(code, mode=FileMode())
-    (errors_dir / "anchor").with_suffix(".py").write_text(formatted)
+    (errors_dir / "anchor").with_suffix(".py").write_text(code)
 
 
 def gen_index_code(idl: Idl) -> str:
@@ -198,7 +193,7 @@ def gen_index_code(idl: Idl) -> str:
     extract_code_and_logs_import = FromImport(
         "anchorpy.error", ["extract_code_and_logs"]
     )
-    program_id_import = FromImport("..program_id", ["PROGRAM_ID"])
+    program_id_import = FromImport("..constants", ["PROGRAM_ID"])
     anchor_import = FromImport(".", ["anchor"])
     re_import = Import("re")
     base_import_lines = [
@@ -233,8 +228,7 @@ def gen_index_code(idl: Idl) -> str:
 def gen_index_file(idl: Idl, errors_dir: Path) -> None:
     code = gen_index_code(idl)
     path = errors_dir / "__init__.py"
-    formatted = format_str(code, mode=FileMode())
-    path.write_text(formatted)
+    path.write_text(code)
 
 
 def gen_errors(idl: Idl, root: Path) -> None:

@@ -1,14 +1,13 @@
-from typing import Iterator, Optional
-from typing import Union as TypingUnion
+from typing import Iterator
 
-from genpy import (
+from anchorpy.clientgen.genpy import (
     Assign,
     FromImport,
     Generable,
     Suite,
 )
-from genpy import Class as BrokenClass
-from genpy import Function as FunctionOriginal
+from anchorpy.clientgen.genpy import Class as BrokenClass
+from anchorpy.clientgen.genpy import Function as FunctionOriginal
 
 
 class Class(BrokenClass):
@@ -26,7 +25,7 @@ class Class(BrokenClass):
 
 
 class TypedParam(Generable):
-    def __init__(self, name: str, type_: Optional[str]) -> None:
+    def __init__(self, name: str, type_: str | None) -> None:
         self.name = name
         self.type = type_
 
@@ -52,8 +51,8 @@ class Union(Generable):
         self.members = members
 
     def generate(self) -> Iterator[str]:
-        joined = ",".join(self.members)
-        yield f"typing.Union[{joined}]"
+        joined = " | ".join(self.members)
+        yield f"{joined}"
 
 
 class Tuple(Generable):
@@ -84,7 +83,7 @@ class TupleTypeAlias(Generable):
 
 
 class StrDictEntry(Generable):
-    def __init__(self, key: str, val: TypingUnion[str, "StrDict"]) -> None:
+    def __init__(self, key: str, val: "str | StrDict") -> None:
         self.key = key
         self.val = val
 
@@ -202,12 +201,13 @@ class Dataclass(Class):
     def __init__(
         self,
         name,
-        attributes: list[TypingUnion[TypedParam, Assign, ClassMethod, Method]],
+        attributes: list[TypedParam | Assign | ClassMethod | Method],
+        bases: list[str] | None = None,
     ) -> None:
-        super().__init__(name, None, attributes)
+        super().__init__(name, bases or [], attributes)
 
     def generate(self) -> Iterator[str]:
-        yield "@dataclass"
+        yield "@dataclass(slots=True)"
         yield from super().generate()
 
 

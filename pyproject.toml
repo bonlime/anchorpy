@@ -9,36 +9,22 @@ dependencies = [
     "based58>=0.1.1,<0.2",
     "toml>=0.10.2,<0.11",
     "typer>=0.16.0",
-    "ipython>=9.4.0",
-    "pytest-asyncio>=1.1.0",
-    "pytest-xprocess>=1.0.2",
-    "autoflake>=2.3.1",
-    "black>=25.1.0",
-    "genpy>=2022.1",
-    "anchorpy-idl @ git+https://github.com/bonlime/anchorpy-idl.git@fix-init",
+    "typing_extensions>=4.8.0",
+    # "anchorpy-idl @ git+https://github.com/bonlime/anchorpy-idl.git@fix-init",
+    "anchorpy-idl @ /Users/zakirove/repoz/anchorpy-idl-bonlime",
+    "msgspec>=0.20.0",
+    "ruff",
 ]
-#    "anchorpy-idl",
 name = "anchorpy"
-version = "0.21.0"
+version = "0.22.6"
 description = "The Python Anchor client."
 authors = [{ name = "kevinheavey", email = "kevinheavey123@gmail.com" }]
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 readme = "README.md"
 
-#"anchorpy-core>=0.2.0,<0.3",
 [project.optional-dependencies]
-cli = [
-    "typer==0.4.1",
-    "ipython>=8.0.1,<9",
-    "genpy~=2021.1",
-    "black>=22.3.0,<23",
-    "autoflake~=1.4",
-]
-pytest = [
-    "py>=1.11.0,<2",
-    "pytest-xprocess>=0.18.1,<0.19",
-    "pytest-asyncio>=0.21.0,<0.22",
-]
+cli = ["ipython>=8.18.0,<9"]
+pytest = ["pytest>=8.0.0,<9", "pytest-asyncio>=1.1.0", "pytest-xprocess>=1.0.2"]
 
 [project.urls]
 Repository = "https://github.com/kevinheavey/anchorpy"
@@ -52,42 +38,20 @@ pytest_anchorpy = "anchorpy.pytest_plugin"
 
 [dependency-groups]
 dev = [
-    "black>=22.3.0,<23",
     "mypy>=0.982,<0.983",
     "jinja2==3.0.3",
     "mkdocs-material>=8.1.7,<9",
     "bump2version>=1.0.1,<2",
     "mkdocstrings>=0.17.0,<0.18",
-    "py>=1.11.0,<2",
-    "pytest>=7.2.0,<8",
-    "pytest-asyncio>=0.21.0,<0.22",
-    "pytest-xprocess>=0.18.1,<0.19",
-    "ruff>=0.0.220,<0.0.221",
+    "pytest>=8.0.0,<9",
+    # "pytest-asyncio>=0.21.0,<0.22",
+    "pytest-xprocess>=1.0.2",
+    "ruff",
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.ruff]
-select = [
-    "A",
-    "B",
-    "D",
-    "E",
-    "F",
-    "I",
-    "ARG",
-    "BLE",
-    "C4",
-    "SIM",
-    "PLC",
-    "PLE",
-    "PLR",
-    "PLW",
-    "RUF",
-]
-ignore = ["B023", "D100", "D101", "D102", "D103", "D104", "D107", "D203"]
+requires = ["uv_build>=0.9.11,<0.10.0"]
+build-backend = "uv_build"
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -112,16 +76,37 @@ exclude = [
     "venv",
 ]
 
+
+# Assume Python 3.11
+target-version = "py311"
+
+[tool.ruff.lint]
+ignore = ["B023", "D100", "D101", "D102", "D103", "D104", "D107", "D203"]
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.10.
-target-version = "py310"
+select = [
+    "A",
+    "B",
+    "D",
+    "E",
+    "F",
+    "I",
+    "ARG",
+    "BLE",
+    "C4",
+    "SIM",
+    "PLC",
+    "PLE",
+    "PLR",
+    "PLW",
+    "RUF",
+]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "src/anchorpy/__init__.py" = ["F401"]
 "src/anchorpy/coder/*.py" = ["ARG002"]
 "src/anchorpy/borsh_extension.py" = ["ARG002"]
@@ -130,25 +115,15 @@ convention = "google"
 "tests/client_gen/token/**/*.py" = ["C417", "I001", "F401"]
 "src/anchorpy/cli.py" = ["B008"]
 
-#[tool.pyright]
-#reportMissingModuleSource = false
 [tool.ty.rules]
 index-out-of-bounds = "ignore"
 
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-#pythonVersion = "3.13"
 typeCheckingMode = "basic"
 include = ["src"]
 exclude = [".venv"]
-
-[tool.rye]
-managed = true
-dev-dependencies = ["pytest>=8.4.1", "pytest-xprocess>=1.0.2"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

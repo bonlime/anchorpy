@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Union, cast
+from typing import Union, cast
 
 from anchorpy_idl import (
     Idl,
@@ -9,9 +9,7 @@ from anchorpy_idl import (
     IdlTypeArray,
     IdlTypeSimple,
 )
-from autoflake import fix_code
-from black import FileMode, format_str
-from genpy import (
+from anchorpy.clientgen.genpy import (
     Assign,
     Collection,
     FromImport,
@@ -25,6 +23,8 @@ from genpy import (
 from pyheck import shouty_snake, snake, upper_camel
 
 from anchorpy.clientgen.common import (
+    _bytes_literal,
+    _field_from_decoded,
     _field_to_encodable,
     _layout_for_type,
     _py_type_from_idl,
@@ -33,6 +33,9 @@ from anchorpy.clientgen.common import (
 from anchorpy.clientgen.genpy_extension import (
     ANNOTATIONS_IMPORT,
     Call,
+    Class,
+    ClassMethod,
+    Method,
     Function,
     List,
     NamedArg,
@@ -59,39 +62,62 @@ def gen_instructions(idl: Idl, root: Path, gen_pdas: bool) -> None:
     gen_index_file(idl, instructions_dir)
     instructions = gen_instructions_code(idl, instructions_dir, gen_pdas)
     for path, code in instructions.items():
-        formatted = format_str(code, mode=FileMode())
-        fixed = fix_code(formatted, remove_all_unused_imports=True)
-        path.write_text(fixed)
+        path.write_text(code)
 
 
 def gen_index_file(idl: Idl, instructions_dir: Path) -> None:
     code = gen_index_code(idl)
     path = instructions_dir / "__init__.py"
-    formatted = format_str(code, mode=FileMode())
-    path.write_text(formatted)
+    path.write_text(code)
 
 
 def gen_index_code(idl: Idl) -> str:
-    imports: list[FromImport] = []
+    imports: list[TypingUnion[Import, FromImport]] = [Import("typing")]
+    program_name = _sanitize(upper_camel(getattr(idl, "name", "Program")))
+    instruction_type_alias = f"{program_name}InstructionsType"
+    instruction_classes: list[str] = []
     for ix in idl.instructions:
         ix_name_snake_unsanitized = snake(ix.name)
         ix_name = _sanitize(ix_name_snake_unsanitized)
-        import_members: list[str] = [ix_name]
-        if ix.args:
-            import_members.append(_args_interface_name(ix_name_snake_unsanitized))
+        import_members: list[str] = [
+            ix_name,
+            _args_class_name(ix_name_snake_unsanitized),
+        ]
         if ix.accounts:
             import_members.append(_accounts_interface_name(ix_name_snake_unsanitized))
         if import_members:
             imports.append(FromImport(f".{ix_name}", import_members))
-    return str(Collection(imports))
+        instruction_classes.append(_args_class_name(ix_name_snake_unsanitized))
+    sections = [str(Collection(imports))]
+    if instruction_classes:
+        union_members = " | \n    ".join(
+            f"type[{instruction}]" for instruction in instruction_classes
+        )
+        sections.append(f"{instruction_type_alias} = (\n    {union_members}\n)")
+        list_members = ",\n    ".join(instruction_classes)
+        sections.append(
+            f"instructions: list[{instruction_type_alias}] = [\n    {list_members},\n]"
+        )
+        sections.append(
+            f"INSTRUCTION_MAP: dict[bytes, {instruction_type_alias}] = "
+            "{instr.discriminator: instr for instr in instructions}"
+        )
+    return "\n\n".join(sections)
 
 
-def _args_interface_name(ix_name: str) -> str:
-    return f"{upper_camel(ix_name)}Args"
+def _args_class_name(ix_name: str) -> str:
+    return _sanitize(upper_camel(ix_name))
 
 
 def _accounts_interface_name(ix_name: str) -> str:
     return f"{upper_camel(ix_name)}Accounts"
+
+
+def _instruction_discriminator(ix, ix_name_snake: str) -> str:
+    discriminator = getattr(ix, "discriminator", None)
+    if discriminator is not None:
+        return _bytes_literal(discriminator)
+    return repr(_sighash(ix_name_snake))
 
 
 def recurse_accounts(
@@ -158,7 +184,7 @@ def gen_accounts(
     name,
     idl_accs: list[IdlAccountItem],
     gen_pdas: bool,
-    accum: Optional[GenAccountsRes] = None,
+    accum: GenAccountsRes | None = None,
 ) -> GenAccountsRes:
     if accum is None:
         extra_typeddicts_to_use: list[TypedDict] = []
@@ -204,10 +230,15 @@ def gen_accounts(
                     const_pda_body_items = [
                         str(
                             to_buffer_value(
-                                #cast(Union[IdlTypeSimple, IdlTypeArray], seed.ty),
-                                #seed.ty if seed.ty is not None else IdlTypeArray,
-                                IdlTypeArray if getattr(seed, 'ty', None) is None else cast(
-                                    Union[IdlTypeSimple, IdlTypeArray], seed.ty),
+                                # cast(Union[IdlTypeSimple, IdlTypeArray], seed.ty),
+                                # seed.ty if seed.ty is not None else IdlTypeArray,
+                                (
+                                    IdlTypeArray
+                                    if getattr(seed, "ty", None) is None
+                                    else cast(
+                                        Union[IdlTypeSimple, IdlTypeArray], seed.ty
+                                    )
+                                ),
                                 cast(Union[str, int, list[int]], seed.value),
                             )
                         )
@@ -230,7 +261,7 @@ def gen_accounts(
                     CONST_ACCOUNTS[acc_name]
                 except KeyError:
                     if acc.optional:
-                        params.append(TypedParam(acc_name, "typing.Optional[Pubkey]"))
+                        params.append(TypedParam(acc_name, "Pubkey | None"))
                     else:
                         params.append(TypedParam(acc_name, "Pubkey"))
     maybe_typed_dict_container = [TypedDict(name, params)] if params else []
@@ -243,6 +274,7 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
     imports = [
         ANNOTATIONS_IMPORT,
         Import("typing"),
+        FromImport("construct", ["Container", "Construct"]),
         FromImport("solders.pubkey", ["Pubkey"]),
         FromImport("solders.system_program", ["ID as SYS_PROGRAM_ID"]),
         FromImport("solders.sysvar", ["RENT", "CLOCK"]),
@@ -253,19 +285,24 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
         FromImport(
             "anchorpy.borsh_extension", ["BorshPubkey", "EnumForCodegen", "COption"]
         ),
-        FromImport("construct", ["Pass", "Construct"]),
         ImportAs("borsh_construct", "borsh"),
         *types_import,
-        FromImport("..program_id", ["PROGRAM_ID"]),
+        FromImport("..base", ["InstructionData"]),
+        FromImport("..constants", ["PROGRAM_ID"]),
     ]
     result = {}
     for ix in idl.instructions:
         ix_name_snake_unsanitized = snake(ix.name)
         ix_name = _sanitize(ix_name_snake_unsanitized)
+        args_class_name = _args_class_name(ix_name_snake_unsanitized)
+        discriminator_literal = _instruction_discriminator(
+            ix, ix_name_snake_unsanitized
+        )
         filename = (out / ix_name).with_suffix(".py")
         args_interface_params: list[TypedParam] = []
         layout_items: list[str] = []
         encoded_args_entries: list[StrDictEntry] = []
+        from_decoded_entries: list[NamedArg] = []
         accounts_interface_name = _accounts_interface_name(ix_name_snake_unsanitized)
         for arg in ix.args:
             arg_name = _sanitize(snake(arg.name))
@@ -285,6 +322,17 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                     idl=idl, ty=arg.ty, name=arg_name, types_relative_imports=False
                 )
             )
+            from_decoded_entries.append(
+                NamedArg(
+                    arg_name,
+                    _field_from_decoded(
+                        idl=idl,
+                        ty=arg,
+                        val_prefix="obj.",
+                        types_relative_imports=False,
+                    ),
+                )
+            )
             encoded_args_entries.append(
                 StrDictEntry(
                     arg_name,
@@ -292,26 +340,15 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                         idl=idl,
                         ty=arg,
                         types_relative_imports=False,
-                        val_prefix='args["',
-                        val_suffix='"]',
+                        val_prefix="self.",
+                        val_suffix="",
                     ),
                 )
             )
-        if ix.args:
-            args_interface_name = _args_interface_name(ix_name)
-            args_interface_container = [
-                TypedDict(args_interface_name, args_interface_params)
-            ]
-            layout_val = f"borsh.CStruct({','.join(layout_items)})"
-            layout_assignment_container = [Assign("layout", layout_val)]
-            args_container = [TypedParam("args", args_interface_name)]
-            encoded_args_val = f"layout.build({StrDict(encoded_args_entries)})"
-        else:
-            args_interface_container = []
-            layout_val = "Pass"
-            args_container = []
-            layout_assignment_container = []
-            encoded_args_val = 'b""'
+        layout_val = (
+            f"borsh.CStruct({','.join(layout_items)}).compile()" if ix.args else "None"
+        )
+        args_container = [TypedParam("args", args_class_name)]
         accounts_container = (
             [TypedParam("accounts", accounts_interface_name)] if ix.accounts else []
         )
@@ -323,12 +360,46 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
         remaining_accounts_concatenation = If(
             "remaining_accounts is not None", Line("keys += remaining_accounts")
         )
-        identifier_assignment = Assign(
-            "identifier", _sighash(ix_name_snake_unsanitized)
+        data_expr = (
+            "args.discriminator + args.layout.build(args.to_encodable())"
+            if encoded_args_entries
+            else "args.discriminator"
         )
-        encoded_args_assignment = Assign("encoded_args", encoded_args_val)
-        data_assignment = Assign("data", "identifier + encoded_args")
+        data_assignment = Assign("data", data_expr)
         returning = Return("Instruction(program_id, data, keys)")
+        to_encodable_body = (
+            StrDict(encoded_args_entries) if encoded_args_entries else StrDict([])
+        )
+        from_decoded_body = (
+            Call("cls", from_decoded_entries) if from_decoded_entries else "cls()"
+        )
+        args_dataclass = Class(
+            args_class_name,
+            ["InstructionData"],
+            [
+                Assign("discriminator: typing.ClassVar", discriminator_literal),
+                Assign("layout: typing.ClassVar", layout_val),
+                *args_interface_params,
+                ClassMethod(
+                    "decode",
+                    [TypedParam("data", "bytes")],
+                    Return("super().decode(data)"),
+                    f'"{args_class_name}"',
+                ),
+                ClassMethod(
+                    "from_decoded",
+                    [TypedParam("obj", "Container")],
+                    Return(from_decoded_body),
+                    f'"{args_class_name}"',
+                ),
+                Method(
+                    "to_encodable",
+                    [],
+                    Return(to_encodable_body),
+                    "dict[str, typing.Any]",
+                ),
+            ],
+        )
         ix_fn = Function(
             ix_name,
             [
@@ -337,15 +408,13 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                 TypedParam("program_id", "Pubkey = PROGRAM_ID"),
                 TypedParam(
                     "remaining_accounts",
-                    "typing.Optional[typing.List[AccountMeta]] = None",
+                    "list[AccountMeta] | None = None",
                 ),
             ],
             Suite(
                 [
                     keys_assignment,
                     remaining_accounts_concatenation,
-                    identifier_assignment,
-                    encoded_args_assignment,
                     data_assignment,
                     returning,
                 ]
@@ -355,8 +424,7 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
         contents = Collection(
             [
                 *imports,
-                *args_interface_container,
-                *layout_assignment_container,
+                args_dataclass,
                 *const_pdas,
                 *accounts,
                 ix_fn,
