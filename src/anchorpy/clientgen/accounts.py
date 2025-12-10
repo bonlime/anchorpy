@@ -114,7 +114,7 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
     accType = find_type_by_name(acc.name, idl.types)
 
     ty = cast(IdlTypeDefStruct, accType.ty)
-    fields = ty.fields.fields
+    fields = ty.fields.fields if ty.fields else []
     name = _sanitize(acc.name)
     json_interface_name = _json_interface_name(name)
     layout_items: list[str] = []

@@ -1,4 +1,5 @@
 """IDL coding."""
+
 from dataclasses import fields as dc_fields
 from dataclasses import make_dataclass
 from keyword import kwlist
@@ -47,12 +48,16 @@ from pyheck import snake
 from anchorpy.borsh_extension import BorshPubkey, _DataclassStruct
 from anchorpy.idl import TypeDefs
 
+
 def find_type_by_name(type_name, types_list) -> IdlTypeDef:
     """Find an IdlTypeDef in types_list that matches the given type_name, or return None."""
     for type_def in types_list:
         if type_def.name == type_name:
             return type_def
-    raise ValueError(f"Type '{type_name}' not found in types list")  # Raise error if type not found
+    raise ValueError(
+        f"Type '{type_name}' not found in types list"
+    )  # Raise error if type not found
+
 
 """
 FIELD_TYPE_MAP: Mapping[IdlTypeSimple, Construct] = MappingProxyType(
@@ -77,24 +82,24 @@ FIELD_TYPE_MAP: Mapping[IdlTypeSimple, Construct] = MappingProxyType(
 )
 """
 FIELD_TYPE_MAP: Mapping[IdlTypeSimple, Construct] = MappingProxyType(
-{
-    IdlTypeSimple.Bool: Bool,
-    IdlTypeSimple.U8:U8,
-    IdlTypeSimple.I8: I8,
-    IdlTypeSimple.U16: U16,
-    IdlTypeSimple.I16: I16,
-    IdlTypeSimple.U32: U32,
-    IdlTypeSimple.I32: I32,
-    IdlTypeSimple.F32: F32,
-    IdlTypeSimple.U64: U64,
-    IdlTypeSimple.I64: I64,
-    IdlTypeSimple.F64: F64,
-    IdlTypeSimple.U128: U128,
-    IdlTypeSimple.I128: I128,
-    IdlTypeSimple.Bytes: borshc.Bytes,
-    IdlTypeSimple.String: borshc.String,
-    IdlTypeSimple.Pubkey: BorshPubkey,
-}
+    {
+        IdlTypeSimple.Bool: Bool,
+        IdlTypeSimple.U8: U8,
+        IdlTypeSimple.I8: I8,
+        IdlTypeSimple.U16: U16,
+        IdlTypeSimple.I16: I16,
+        IdlTypeSimple.U32: U32,
+        IdlTypeSimple.I32: I32,
+        IdlTypeSimple.F32: F32,
+        IdlTypeSimple.U64: U64,
+        IdlTypeSimple.I64: I64,
+        IdlTypeSimple.F64: F64,
+        IdlTypeSimple.U128: U128,
+        IdlTypeSimple.I128: I128,
+        IdlTypeSimple.Bytes: borshc.Bytes,
+        IdlTypeSimple.String: borshc.String,
+        IdlTypeSimple.Pubkey: BorshPubkey,
+    }
 )
 
 
@@ -177,7 +182,9 @@ def _typedef_layout_without_field_name(
         if typedef_type.fields == None:
             field_layouts = []
         else:
-            field_layouts = [_field_layout(field, types) for field in typedef_type.fields.fields]
+            field_layouts = [
+                _field_layout(field, types) for field in typedef_type.fields.fields
+            ]
         cstruct = CStruct(*field_layouts)
         datacls = _idl_typedef_ty_struct_to_dataclass_type(typedef_type, name)
         return _DataclassStruct(cstruct, datacls=datacls)

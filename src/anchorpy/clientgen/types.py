@@ -7,8 +7,12 @@ from anchorpy_idl import (
     IdlEnumVariant,
     IdlField,
     IdlType,
+    IdlTypeArray,
+    IdlTypeDefined,
     IdlTypeDefAlias,
     IdlTypeDefStruct,
+    IdlTypeOption,
+    IdlTypeVec,
     # IdlTypeDefinitionTyAlias,
     # IdlTypeDefinitionTyStruct,
 )
@@ -68,6 +72,62 @@ def _collect_discriminators(idl: Idl, attr: str) -> dict[str, str]:
             continue
         res[_sanitize(item.name)] = _bytes_literal(discriminator)
     return res
+
+
+def _collect_defined_type_modules_from_idl_type(
+    ty: IdlType, allowed_modules: set[str]
+) -> set[str]:
+    modules: set[str] = set()
+    if isinstance(ty, IdlTypeDefined):
+        module = _sanitize(snake(ty.name))
+        if module in allowed_modules:
+            modules.add(module)
+    elif isinstance(ty, IdlTypeVec):
+        modules |= _collect_defined_type_modules_from_idl_type(ty.vec, allowed_modules)
+    elif isinstance(ty, IdlTypeOption):
+        modules |= _collect_defined_type_modules_from_idl_type(
+            ty.option, allowed_modules
+        )
+    elif isinstance(ty, IdlTypeArray):
+        modules |= _collect_defined_type_modules_from_idl_type(
+            ty.array[0], allowed_modules
+        )
+    return modules
+
+
+def _collect_defined_type_modules_from_typedef(
+    ty, allowed_modules: set[str]
+) -> set[str]:
+    # print(ty)
+    modules: set[str] = set()
+    if isinstance(ty, IdlTypeDefAlias):
+        modules |= _collect_defined_type_modules_from_idl_type(
+            ty.alias, allowed_modules
+        )
+    elif isinstance(ty, IdlTypeDefStruct):
+        if ty.fields:
+            for field in ty.fields.fields:
+                modules |= _collect_defined_type_modules_from_idl_type(
+                    field.ty, allowed_modules
+                )
+    else:
+        for variant in ty.variants:
+            fields = variant.fields
+            if not fields:
+                continue
+            fields = fields.fields
+            first_field = fields[0]
+            if isinstance(first_field, IdlField):
+                for field in cast(list[IdlField], fields):
+                    modules |= _collect_defined_type_modules_from_idl_type(
+                        field.ty, allowed_modules
+                    )
+            else:
+                for field in cast(list[IdlType], fields):
+                    modules |= _collect_defined_type_modules_from_idl_type(
+                        field, allowed_modules
+                    )
+    return modules
 
 
 def gen_types(idl: Idl, root: Path) -> None:
@@ -179,24 +239,27 @@ def gen_types_code(
 ) -> dict[Path, str]:
     res = {}
     types_module_names = [_sanitize(snake(ty.name)) for ty in idl.types]
+    types_module_names_set = set(types_module_names)
     for ty in idl.types:
         ty_name = _sanitize(ty.name)
         module_name = _sanitize(snake(ty.name))
         base_class = None
         discriminator_literal = None
+        ty_type = ty.ty
         if ty_name in account_discriminators:
             base_class = "AccountData"
             discriminator_literal = account_discriminators[ty_name]
         elif ty_name in event_discriminators:
             base_class = "EventData"
             discriminator_literal = event_discriminators[ty_name]
-        relative_import_items = [
-            mod for mod in types_module_names if mod != module_name
-        ]
+        referenced_modules = _collect_defined_type_modules_from_typedef(
+            ty_type, types_module_names_set
+        )
+        referenced_modules.discard(module_name)
+        relative_import_items = sorted(referenced_modules)
         relative_import_container = (
             [FromImport(".", relative_import_items)] if relative_import_items else []
         )
-        ty_type = ty.ty
         if isinstance(ty_type, IdlTypeDefAlias):
             body = Assign(
                 ty.name,
