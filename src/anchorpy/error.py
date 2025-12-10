@@ -1,4 +1,5 @@
 """This module handles AnchorPy errors."""
+
 from __future__ import annotations
 
 import re
@@ -63,6 +64,36 @@ class _LangErrorCode(IntEnum):
     ConstraintMintFreezeAuthority = 2017
     ConstraintMintDecimals = 2018
     ConstraintSpace = 2019
+    ConstraintAccountIsNone = 2020
+    ConstraintTokenTokenProgram = 2021
+    ConstraintMintTokenProgram = 2022
+    ConstraintAssociatedTokenTokenProgram = 2023
+    ConstraintMintGroupPointerExtension = 2024
+    ConstraintMintGroupPointerExtensionAuthority = 2025
+    ConstraintMintGroupPointerExtensionGroupAddress = 2026
+    ConstraintMintGroupMemberPointerExtension = 2027
+    ConstraintMintGroupMemberPointerExtensionAuthority = 2028
+    ConstraintMintGroupMemberPointerExtensionMemberAddress = 2029
+    ConstraintMintMetadataPointerExtension = 2030
+    ConstraintMintMetadataPointerExtensionAuthority = 2031
+    ConstraintMintMetadataPointerExtensionMetadataAddress = 2032
+    ConstraintMintCloseAuthorityExtension = 2033
+    ConstraintMintCloseAuthorityExtensionAuthority = 2034
+    ConstraintMintPermanentDelegateExtension = 2035
+    ConstraintMintPermanentDelegateExtensionDelegate = 2036
+    ConstraintMintTransferHookExtension = 2037
+    ConstraintMintTransferHookExtensionAuthority = 2038
+    ConstraintMintTransferHookExtensionProgramId = 2039
+    ConstraintDuplicateMutableAccount = 2040
+
+    # Signature verification errors
+    Ed25519InvalidProgram = 2040
+    Secp256k1InvalidProgram = 2041
+    InstructionHasAccounts = 2042
+    MessageTooLong = 2043
+    InvalidRecoveryId = 2045
+    SignatureVerificationFailed = 2047
+
     # Require
     RequireViolated = 2500
     RequireEqViolated = 2501
@@ -88,8 +119,15 @@ class _LangErrorCode(IntEnum):
     AccountNotProgramData = 3013
     AccountNotAssociatedTokenAccount = 3014
     AccountSysvarMismatch = 3015
+    AccountReallocExceedsLimit = 3016
+    AccountDuplicateReallocs = 3017
+
     # State.
     StateInvalidAddress = 4000
+    # Miscellaneous
+    DeclaredProgramIdMismatch = 4100
+    TryingToInitPayerAsProgramAccount = 4101
+    InvalidNumericConversion = 4102
 
     # Used for APIs that shouldn't be used anymore.
     Deprecated = 5000
@@ -97,8 +135,10 @@ class _LangErrorCode(IntEnum):
 
 LangErrorMessage: Dict[int, str] = {
     # Instructions.
-    _LangErrorCode.InstructionMissing: "8 byte instruction identifier not provided",
-    _LangErrorCode.InstructionFallbackNotFound: "Fallback functions are not supported",
+    _LangErrorCode.InstructionMissing: "Instruction discriminator not provided",
+    _LangErrorCode.InstructionFallbackNotFound: (
+        "Fallback functions are not supported"
+    ),
     _LangErrorCode.InstructionDidNotDeserialize: (
         "The program could not deserialize the given instruction"
     ),
@@ -114,14 +154,16 @@ LangErrorMessage: Dict[int, str] = {
     ),
     # Constraints.
     _LangErrorCode.ConstraintMut: "A mut constraint was violated",
-    _LangErrorCode.ConstraintHasOne: "A has_one constraint was violated",
+    _LangErrorCode.ConstraintHasOne: "A has one constraint was violated",
     _LangErrorCode.ConstraintSigner: "A signer constraint was violated",
     _LangErrorCode.ConstraintRaw: "A raw constraint was violated",
     _LangErrorCode.ConstraintOwner: "An owner constraint was violated",
-    _LangErrorCode.ConstraintRentExempt: "A rent exempt constraint was violated",
+    _LangErrorCode.ConstraintRentExempt: "A rent exemption constraint was violated",
     _LangErrorCode.ConstraintSeeds: "A seeds constraint was violated",
     _LangErrorCode.ConstraintExecutable: "An executable constraint was violated",
-    _LangErrorCode.ConstraintState: "A state constraint was violated",
+    _LangErrorCode.ConstraintState: (
+        "Deprecated Error, feel free to replace with something else"
+    ),
     _LangErrorCode.ConstraintAssociated: "An associated constraint was violated",
     _LangErrorCode.ConstraintAssociatedInit: (
         "An associated init constraint was violated"
@@ -139,6 +181,34 @@ LangErrorMessage: Dict[int, str] = {
     ),
     _LangErrorCode.ConstraintMintDecimals: "A mint decimals constraint was violated",
     _LangErrorCode.ConstraintSpace: "A space constraint was violated",
+    _LangErrorCode.ConstraintAccountIsNone: "A required account for the constraint is None",
+    _LangErrorCode.ConstraintTokenTokenProgram: "A token account token program constraint was violated",
+    _LangErrorCode.ConstraintMintTokenProgram: "A mint token program constraint was violated",
+    _LangErrorCode.ConstraintAssociatedTokenTokenProgram: "An associated token account token program constraint was violated",
+    _LangErrorCode.ConstraintMintGroupPointerExtension: "A group pointer extension constraint was violated",
+    _LangErrorCode.ConstraintMintGroupPointerExtensionAuthority: "A group pointer extension authority constraint was violated",
+    _LangErrorCode.ConstraintMintGroupPointerExtensionGroupAddress: "A group pointer extension group address constraint was violated",
+    _LangErrorCode.ConstraintMintGroupMemberPointerExtension: "A group member pointer extension constraint was violated",
+    _LangErrorCode.ConstraintMintGroupMemberPointerExtensionAuthority: "A group member pointer extension authority constraint was violated",
+    _LangErrorCode.ConstraintMintGroupMemberPointerExtensionMemberAddress: "A group member pointer extension group address constraint was violated",
+    _LangErrorCode.ConstraintMintMetadataPointerExtension: "A metadata pointer extension constraint was violated",
+    _LangErrorCode.ConstraintMintMetadataPointerExtensionAuthority: "A metadata pointer extension authority constraint was violated",
+    _LangErrorCode.ConstraintMintMetadataPointerExtensionMetadataAddress: "A metadata pointer extension metadata address constraint was violated",
+    _LangErrorCode.ConstraintMintCloseAuthorityExtension: "A close authority constraint was violated",
+    _LangErrorCode.ConstraintMintCloseAuthorityExtensionAuthority: "A close authority extension authority constraint was violated",
+    _LangErrorCode.ConstraintMintPermanentDelegateExtension: "A permanent delegate extension constraint was violated",
+    _LangErrorCode.ConstraintMintPermanentDelegateExtensionDelegate: "A permanent delegate extension delegate constraint was violated",
+    _LangErrorCode.ConstraintMintTransferHookExtension: "A transfer hook extension constraint was violated",
+    _LangErrorCode.ConstraintMintTransferHookExtensionAuthority: "A transfer hook extension authority constraint was violated",
+    _LangErrorCode.ConstraintMintTransferHookExtensionProgramId: "A transfer hook extension transfer hook program id constraint was violated",
+    _LangErrorCode.ConstraintDuplicateMutableAccount: "A duplicate mutable account constraint was violated",
+    # Signature verification errors
+    _LangErrorCode.Ed25519InvalidProgram: "Invalid Ed25519 program id for signature verification",
+    _LangErrorCode.Secp256k1InvalidProgram: "Invalid Secp256k1 program id for signature verification",
+    _LangErrorCode.InstructionHasAccounts: "Instruction unexpectedly had account metas",
+    _LangErrorCode.MessageTooLong: "Message length exceeds allowed maximum",
+    _LangErrorCode.InvalidRecoveryId: "Invalid Secp256k1 recovery id",
+    _LangErrorCode.SignatureVerificationFailed: "Signature verification failed",
     # Require.
     _LangErrorCode.RequireViolated: "A require expression was violated",
     _LangErrorCode.RequireEqViolated: "A require_eq expression was violated",
@@ -152,10 +222,10 @@ LangErrorMessage: Dict[int, str] = {
         "The account discriminator was already set on this account"
     ),
     _LangErrorCode.AccountDiscriminatorNotFound: (
-        "No 8 byte discriminator was found on the account"
+        "No discriminator was found on the account"
     ),
     _LangErrorCode.AccountDiscriminatorMismatch: (
-        "8 byte discriminator did not match what was expected"
+        "Account discriminator did not match what was expected"
     ),
     _LangErrorCode.AccountDidNotDeserialize: "Failed to deserialize the account",
     _LangErrorCode.AccountDidNotSerialize: "Failed to serialize the account",
@@ -184,11 +254,24 @@ LangErrorMessage: Dict[int, str] = {
     _LangErrorCode.AccountSysvarMismatch: (
         "The given public key does not match the required sysvar"
     ),
+    _LangErrorCode.AccountReallocExceedsLimit: (
+        "The account reallocation exceeds the MAX_PERMITTED_DATA_INCREASE limit"
+    ),
+    _LangErrorCode.AccountDuplicateReallocs: (
+        "The account was duplicated for more than one reallocation"
+    ),
     # State.
     _LangErrorCode.StateInvalidAddress: (
         "The given state account does not have the correct address"
     ),
     # Misc.
+    _LangErrorCode.DeclaredProgramIdMismatch: (
+        "The declared program id does not match the actual program id"
+    ),
+    _LangErrorCode.TryingToInitPayerAsProgramAccount: (
+        "You cannot/should not initialize the payer account as a program account"
+    ),
+    _LangErrorCode.InvalidNumericConversion: "Error during numeric conversion",
     _LangErrorCode.Deprecated: (
         "The API being used is deprecated and should no longer be used"
     ),
