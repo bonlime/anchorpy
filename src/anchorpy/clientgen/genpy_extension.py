@@ -88,7 +88,7 @@ class StrDictEntry(Generable):
         self.val = val
 
     def generate(self) -> Iterator[str]:
-        yield f'"{self.key}": {self.val},'
+        yield f'"{self.key}": {self.val}'
 
 
 class NamedArg(Generable):
@@ -97,7 +97,7 @@ class NamedArg(Generable):
         self.val = val
 
     def generate(self) -> Iterator[str]:
-        yield f"{self.key}={self.val},"
+        yield f"{self.key}={self.val}"
 
 
 class Call(Generable):
@@ -106,7 +106,7 @@ class Call(Generable):
         self.args = args
 
     def generate(self) -> Iterator[str]:
-        formatted_args = "".join(str(arg) for arg in self.args)
+        formatted_args = ",".join(str(arg) for arg in self.args)
         yield f"{self.func}({formatted_args})"
 
 
@@ -115,7 +115,7 @@ class StrDict(Generable):
         self.items = items
 
     def generate(self) -> Iterator[str]:
-        formatted_items = "".join(str(item) for item in self.items)
+        formatted_items = ", ".join(str(item) for item in self.items)
         yield "{" + formatted_items + "}"
 
 
@@ -125,7 +125,7 @@ class IntDictEntry(Generable):
         self.val = val
 
     def generate(self) -> Iterator[str]:
-        yield f"{self.key}: {self.val},"
+        yield f"{self.key}: {self.val}"
 
 
 class IntDict(Generable):
@@ -133,7 +133,7 @@ class IntDict(Generable):
         self.items = items
 
     def generate(self) -> Iterator[str]:
-        formatted_items = "".join(str(item) for item in self.items)
+        formatted_items = ", ".join(str(item) for item in self.items)
         yield "{" + formatted_items + "}"
 
 
