@@ -75,9 +75,8 @@ def gen_index_file(idl: Idl, instructions_dir: Path) -> None:
 
 
 def gen_index_code(idl: Idl) -> str:
-    imports: list[Import | FromImport] = [Import("typing")]
+    imports: list[Import | FromImport] = [FromImport("typing", ["TypeAlias"])]
     program_name = _sanitize(upper_camel(getattr(idl, "name", "Program")))
-    instruction_type_alias = f"{program_name}InstructionsType"
     instruction_classes: list[str] = []
     for ix in idl.instructions:
         ix_name_snake_unsanitized = snake(ix.name)
@@ -93,16 +92,21 @@ def gen_index_code(idl: Idl) -> str:
         instruction_classes.append(_args_class_name(ix_name_snake_unsanitized))
     sections = [str(Collection(imports))]
     if instruction_classes:
+        instruction_type_alias = f"{program_name}Instructions"
+        instruction_type_alias_cls = f"{program_name}InstructionsCls"
         union_members = " | \n    ".join(
-            f"type[{instruction}]" for instruction in instruction_classes
+            f"{instruction}" for instruction in instruction_classes
         )
         sections.append(f"{instruction_type_alias} = (\n    {union_members}\n)")
+        sections.append(
+            f"{instruction_type_alias_cls}: TypeAlias = type[{instruction_type_alias}]"
+        )
         list_members = ",\n    ".join(instruction_classes)
         sections.append(
-            f"instructions: list[{instruction_type_alias}] = [\n    {list_members},\n]"
+            f"instructions: list[{instruction_type_alias_cls}] = [\n    {list_members},\n]"
         )
         sections.append(
-            f"INSTRUCTION_MAP: dict[bytes, {instruction_type_alias}] = "
+            f"INSTRUCTION_MAP: dict[bytes, {instruction_type_alias_cls}] = "
             "{instr.discriminator: instr for instr in instructions}"
         )
     return "\n\n".join(sections)

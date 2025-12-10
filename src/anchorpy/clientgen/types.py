@@ -158,10 +158,8 @@ def gen_index_code(
     account_discriminators: dict[str, str],
     event_discriminators: dict[str, str],
 ) -> str:
-    imports: list[Import | FromImport] = []
+    imports: list[Import | FromImport] = [FromImport("typing", ["TypeAlias"])]
     program_name = _sanitize(upper_camel(getattr(idl.metadata, "name", "Program")))
-    account_type_alias = f"{program_name}AccountsType"
-    event_type_alias = f"{program_name}EventsType"
     account_types: list[str] = []
     event_types: list[str] = []
     imports.append(FromImport(".", [_sanitize(snake(ty.name)) for ty in idl.types]))
@@ -190,29 +188,37 @@ def gen_index_code(
             event_types.append(sanitized_name)
     sections = [str(Collection(imports))]
     if account_types:
+        account_type_alias = f"{program_name}Accounts"
+        account_type_alias_cls = f"{program_name}AccountsCls"
         account_union_members = " | \n    ".join(
-            f"type[{account}]" for account in account_types
+            f"{account}" for account in account_types
         )
-        sections.append(f"{account_type_alias} = (\n    {account_union_members}\n)")
+        sections.append(
+            f"{account_type_alias}: TypeAlias = (\n    {account_union_members}\n)"
+        )
+        sections.append(
+            f"{account_type_alias_cls}: TypeAlias = type[{account_type_alias}]"
+        )
         account_list_members = ",\n    ".join(account_types)
         sections.append(
-            f"accounts: list[{account_type_alias}] = [\n    {account_list_members},\n]"
+            f"accounts: list[{account_type_alias_cls}] = [\n    {account_list_members},\n]"
         )
         sections.append(
-            f"ACCOUNT_MAP: dict[bytes, {account_type_alias}] = "
+            f"ACCOUNT_MAP: dict[bytes, {account_type_alias_cls}] = "
             "{acc.discriminator: acc for acc in accounts}"
         )
     if event_types:
-        event_union_members = " | \n    ".join(
-            f"type[{event}]" for event in event_types
-        )
+        event_type_alias = f"{program_name}Events"
+        event_type_alias_cls = f"{program_name}EventsCls"
+        event_union_members = " | \n    ".join(f"{event}" for event in event_types)
         sections.append(f"{event_type_alias} = (\n    {event_union_members}\n)")
+        sections.append(f"{event_type_alias_cls}: TypeAlias = type[{event_type_alias}]")
         event_list_members = ",\n    ".join(event_types)
         sections.append(
-            f"events: list[{event_type_alias}] = [\n    {event_list_members},\n]"
+            f"events: list[{event_type_alias_cls}] = [\n    {event_list_members},\n]"
         )
         sections.append(
-            f"EVENT_MAP: dict[bytes, {event_type_alias}] = "
+            f"EVENT_MAP: dict[bytes, {event_type_alias_cls}] = "
             "{event.discriminator: event for event in events}"
         )
     return "\n\n".join(sections)
