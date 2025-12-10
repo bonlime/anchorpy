@@ -321,6 +321,7 @@ def gen_struct(
         *discriminator_assignment,
         Assign("layout: typing.ClassVar", layout_expr),
         *field_params,
+        *decode_method,
         ClassMethod(
             "from_decoded",
             [TypedParam("obj", "Container")],
@@ -340,7 +341,6 @@ def gen_struct(
             Return(f"cls({args_for_from_json})"),
             f'"{name}"',
         ),
-        *decode_method,
     ]
     if base_class:
         struct_cls = Class(name, [base_class], attributes)
