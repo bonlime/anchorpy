@@ -59,7 +59,7 @@ def gen_from_tx_error_fn(has_custom_errors: bool) -> Function:
         ]
     )
     return_type = (
-        "typing.Union[anchor.AnchorError, custom.CustomError, None]"
+        "anchor.AnchorError | custom.CustomError | None"
         if has_custom_errors
         else "anchor.AnchorError | None"
     )

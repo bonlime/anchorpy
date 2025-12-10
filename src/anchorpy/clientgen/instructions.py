@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, cast
+from typing import cast
 
 from anchorpy_idl import (
     Idl,
@@ -7,7 +7,10 @@ from anchorpy_idl import (
     IdlInstructionAccounts,
     IdlSeedConst,
     IdlTypeArray,
+    IdlTypeDefined,
+    IdlTypeOption,
     IdlTypeSimple,
+    IdlTypeVec,
 )
 from anchorpy.clientgen.genpy import (
     Assign,
@@ -72,7 +75,7 @@ def gen_index_file(idl: Idl, instructions_dir: Path) -> None:
 
 
 def gen_index_code(idl: Idl) -> str:
-    imports: list[TypingUnion[Import, FromImport]] = [Import("typing")]
+    imports: list[Import | FromImport] = [Import("typing")]
     program_name = _sanitize(upper_camel(getattr(idl, "name", "Program")))
     instruction_type_alias = f"{program_name}InstructionsType"
     instruction_classes: list[str] = []
@@ -120,6 +123,19 @@ def _instruction_discriminator(ix, ix_name_snake: str) -> str:
     return repr(_sighash(ix_name_snake))
 
 
+def _collect_defined_type_modules(ty) -> set[str]:
+    modules: set[str] = set()
+    if isinstance(ty, IdlTypeDefined):
+        modules.add(_sanitize(snake(ty.name)))
+    elif isinstance(ty, IdlTypeVec):
+        modules |= _collect_defined_type_modules(ty.vec)
+    elif isinstance(ty, IdlTypeOption):
+        modules |= _collect_defined_type_modules(ty.option)
+    elif isinstance(ty, IdlTypeArray):
+        modules |= _collect_defined_type_modules(ty.array[0])
+    return modules
+
+
 def recurse_accounts(
     accs: list[IdlAccountItem],
     nested_names: list[str],
@@ -165,7 +181,7 @@ def recurse_accounts(
 
 
 def to_buffer_value(
-    ty: Union[IdlTypeSimple, IdlTypeArray], value: Union[str, int, list[int]]
+    ty: IdlTypeSimple | IdlTypeArray, value: str | int | list[int]
 ) -> bytes:
     if isinstance(value, int):
         encoder = FIELD_TYPE_MAP[cast(IdlTypeSimple, ty)]
@@ -235,11 +251,9 @@ def gen_accounts(
                                 (
                                     IdlTypeArray
                                     if getattr(seed, "ty", None) is None
-                                    else cast(
-                                        Union[IdlTypeSimple, IdlTypeArray], seed.ty
-                                    )
+                                    else cast(IdlTypeSimple | IdlTypeArray, seed.ty)
                                 ),
-                                cast(Union[str, int, list[int]], seed.value),
+                                cast(str | int | list[int], seed.value),
                             )
                         )
                         for seed in seeds
@@ -270,8 +284,7 @@ def gen_accounts(
 
 
 def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str]:
-    types_import = [FromImport("..", ["types"])] if idl.types else []
-    imports = [
+    imports_base = [
         ANNOTATIONS_IMPORT,
         Import("typing"),
         FromImport("construct", ["Container", "Construct"]),
@@ -286,7 +299,6 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
             "anchorpy.borsh_extension", ["BorshPubkey", "EnumForCodegen", "COption"]
         ),
         ImportAs("borsh_construct", "borsh"),
-        *types_import,
         FromImport("..base", ["InstructionData"]),
         FromImport("..constants", ["PROGRAM_ID"]),
     ]
@@ -312,14 +324,14 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                     _py_type_from_idl(
                         idl=idl,
                         ty=arg.ty,
-                        types_relative_imports=False,
+                        types_relative_imports=True,
                         use_fields_interface_for_struct=False,
                     ),
                 )
             )
             layout_items.append(
                 _layout_for_type(
-                    idl=idl, ty=arg.ty, name=arg_name, types_relative_imports=False
+                    idl=idl, ty=arg.ty, name=arg_name, types_relative_imports=True
                 )
             )
             from_decoded_entries.append(
@@ -329,7 +341,7 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                         idl=idl,
                         ty=arg,
                         val_prefix="obj.",
-                        types_relative_imports=False,
+                        types_relative_imports=True,
                     ),
                 )
             )
@@ -339,7 +351,7 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                     _field_to_encodable(
                         idl=idl,
                         ty=arg,
-                        types_relative_imports=False,
+                        types_relative_imports=True,
                         val_prefix="self.",
                         val_suffix="",
                     ),
@@ -421,9 +433,16 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
             ),
             "Instruction",
         )
+        type_modules: set[str] = set()
+        for arg in ix.args:
+            type_modules |= _collect_defined_type_modules(arg.ty)
+        type_imports = (
+            [FromImport("..types", sorted(type_modules))] if type_modules else []
+        )
         contents = Collection(
             [
-                *imports,
+                *imports_base,
+                *type_imports,
                 args_dataclass,
                 *const_pdas,
                 *accounts,

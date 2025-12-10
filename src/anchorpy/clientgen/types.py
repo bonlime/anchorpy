@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union as TypingUnion
 from typing import cast
 
 from anchorpy_idl import (
@@ -99,7 +98,7 @@ def gen_index_code(
     account_discriminators: dict[str, str],
     event_discriminators: dict[str, str],
 ) -> str:
-    imports: list[TypingUnion[Import, FromImport]] = []
+    imports: list[Import | FromImport] = []
     program_name = _sanitize(upper_camel(getattr(idl.metadata, "name", "Program")))
     account_type_alias = f"{program_name}AccountsType"
     event_type_alias = f"{program_name}EventsType"
@@ -507,8 +506,8 @@ def gen_enum(idl: Idl, name: str, variants: list[IdlEnumVariant]) -> Collection:
     cstructs: list[str] = []
     type_variants_members: list[str] = []
     json_variants_members: list[str] = []
-    json_interface_value_field_types: list[TypingUnion[TypedDict, TupleTypeAlias]] = []
-    value_type_aliases: list[TypingUnion[TypedDict, TupleTypeAlias]] = []
+    json_interface_value_field_types: list[TypedDict | TupleTypeAlias] = []
+    value_type_aliases: list[TypedDict | TupleTypeAlias] = []
     for idx, variant in enumerate(variants):
         discriminator = idx
         fields = variant.fields
