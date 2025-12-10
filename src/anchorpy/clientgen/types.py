@@ -159,7 +159,8 @@ def gen_index_code(
     event_discriminators: dict[str, str],
 ) -> str:
     imports: list[Import | FromImport] = [FromImport("typing", ["TypeAlias"])]
-    program_name = _sanitize(upper_camel(getattr(idl.metadata, "name", "Program")))
+    program_name_raw = getattr(idl.metadata, "name", getattr(idl, "name", "Program"))
+    program_name = _sanitize(upper_camel(program_name_raw))
     account_types: list[str] = []
     event_types: list[str] = []
     imports.append(FromImport(".", [_sanitize(snake(ty.name)) for ty in idl.types]))

@@ -76,7 +76,8 @@ def gen_index_file(idl: Idl, instructions_dir: Path) -> None:
 
 def gen_index_code(idl: Idl) -> str:
     imports: list[Import | FromImport] = [FromImport("typing", ["TypeAlias"])]
-    program_name = _sanitize(upper_camel(getattr(idl, "name", "Program")))
+    program_name_raw = getattr(idl.metadata, "name", getattr(idl, "name", "Program"))
+    program_name = _sanitize(upper_camel(program_name_raw))
     instruction_classes: list[str] = []
     for ix in idl.instructions:
         ix_name_snake_unsanitized = snake(ix.name)
