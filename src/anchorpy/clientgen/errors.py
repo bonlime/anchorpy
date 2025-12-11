@@ -13,7 +13,7 @@ from anchorpy.clientgen.genpy import (
 )
 from anchorpy.clientgen.genpy import Function as UntypedFunction
 
-from anchorpy.clientgen.common import _sanitize
+from anchorpy.clientgen.common import _add_generated_file_header, _sanitize
 from anchorpy.clientgen.genpy_extension import (
     Class,
     Function,
@@ -124,7 +124,9 @@ def gen_custom_errors(idl: Idl, errors_dir: Path) -> None:
     if errors is None or not errors:
         return
     code = gen_custom_errors_code(errors)
-    (errors_dir / "custom.py").with_suffix(".py").write_text(code)
+    (errors_dir / "custom.py").with_suffix(".py").write_text(
+        _add_generated_file_header(code)
+    )
 
 
 def gen_anchor_errors_code() -> str:
@@ -176,7 +178,9 @@ def gen_anchor_errors_code() -> str:
 
 def gen_anchor_errors(errors_dir: Path) -> None:
     code = gen_anchor_errors_code()
-    (errors_dir / "anchor").with_suffix(".py").write_text(code)
+    (errors_dir / "anchor").with_suffix(".py").write_text(
+        _add_generated_file_header(code)
+    )
 
 
 def gen_index_code(idl: Idl) -> str:
@@ -228,7 +232,7 @@ def gen_index_code(idl: Idl) -> str:
 def gen_index_file(idl: Idl, errors_dir: Path) -> None:
     code = gen_index_code(idl)
     path = errors_dir / "__init__.py"
-    path.write_text(code)
+    path.write_text(_add_generated_file_header(code))
 
 
 def gen_errors(idl: Idl, root: Path) -> None:

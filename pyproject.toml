@@ -10,7 +10,8 @@ dependencies = [
     "toml>=0.10.2,<0.11",
     "typer>=0.16.0",
     "typing_extensions>=4.8.0",
-    "anchorpy-idl @ git+https://github.com/bonlime/anchorpy-idl.git@fix-init",
+    # "anchorpy-idl @ git+https://github.com/bonlime/anchorpy-idl.git@fix-init",
+    "anchorpy-idl @ /Users/zakirove/repoz/anchorpy-idl-bonlime",
     "msgspec>=0.20.0",
     "ruff",
 ]

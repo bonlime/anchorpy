@@ -24,6 +24,8 @@ from anchorpy.clientgen.genpy import (
 from pyheck import snake
 
 from anchorpy.clientgen.common import (
+    _add_generated_file_header,
+    _bytes_literal,
     _field_from_decoded,
     _field_from_json,
     _field_to_json,
@@ -58,12 +60,12 @@ def gen_accounts(idl: Idl, root: Path) -> None:
     gen_index_file(idl, accounts_dir)
     accounts_dict = gen_accounts_code(idl, accounts_dir)
     for path, code in accounts_dict.items():
-        path.write_text(code)
+        path.write_text(_add_generated_file_header(code))
 
 
 def gen_index_file(idl: Idl, accounts_dir: Path) -> None:
     code = gen_index_code(idl)
-    (accounts_dir / "__init__.py").write_text(code)
+    (accounts_dir / "__init__.py").write_text(_add_generated_file_header(code))
 
 
 def gen_index_code(idl: Idl) -> str:
@@ -170,8 +172,9 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
             )
         )
     json_interface = TypedDict(json_interface_name, json_interface_params)
+    discriminator_literal = _bytes_literal(_account_discriminator(name))
     discriminator_assignment = Assign(
-        "discriminator: typing.ClassVar", _account_discriminator(name)
+        "discriminator: typing.ClassVar", discriminator_literal
     )
     layout_assignment = Assign(
         "layout: typing.ClassVar",

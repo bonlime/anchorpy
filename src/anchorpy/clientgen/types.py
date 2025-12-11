@@ -31,6 +31,7 @@ from anchorpy.clientgen.genpy import (
 from pyheck import snake, upper_camel
 
 from anchorpy.clientgen.common import (
+    _add_generated_file_header,
     _bytes_literal,
     _field_from_decoded,
     _field_from_json,
@@ -150,7 +151,7 @@ def gen_index_file(
 ) -> None:
     code = gen_index_code(idl, account_discriminators, event_discriminators)
     path = types_dir / "__init__.py"
-    path.write_text(code)
+    path.write_text(_add_generated_file_header(code))
 
 
 def gen_index_code(
@@ -235,7 +236,7 @@ def gen_type_files(
         idl, types_dir, account_discriminators, event_discriminators
     )
     for path, code in types_code.items():
-        path.write_text(code)
+        path.write_text(_add_generated_file_header(code))
 
 
 def gen_types_code(

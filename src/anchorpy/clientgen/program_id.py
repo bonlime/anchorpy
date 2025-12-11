@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from anchorpy.clientgen.common import _add_generated_file_header
 from anchorpy.clientgen.genpy import Assign, Collection, FromImport
 
 
@@ -11,4 +12,4 @@ def gen_program_id_code(program_id: str) -> str:
 
 def gen_program_id(program_id: str, root: Path) -> None:
     code = gen_program_id_code(program_id)
-    (root / "program_id.py").write_text(code)
+    (root / "program_id.py").write_text(_add_generated_file_header(code))

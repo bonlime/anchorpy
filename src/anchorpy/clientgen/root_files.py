@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from anchorpy_idl import Idl, IdlType, IdlTypeSimple
-from anchorpy.clientgen.common import _sanitize
+from anchorpy.clientgen.common import _add_generated_file_header, _sanitize
 
 
 BASE_TEMPLATE = """\
@@ -57,7 +57,7 @@ class EventData(BaseTypeDecoder, gc=False):
 
 
 def gen_base(root: Path) -> None:
-    (root / "base.py").write_text(BASE_TEMPLATE)
+    (root / "base.py").write_text(_add_generated_file_header(BASE_TEMPLATE))
 
 
 def _format_const_value(const_type: IdlType, const_value: Any) -> str:
@@ -96,4 +96,4 @@ def gen_constants(idl: Idl, program_id: str, root: Path) -> None:
         value_literal = _format_const_value(const.ty, const.value)
         lines.append(f"{const_name} = {value_literal}")
     code = "\n".join(lines) + "\n"
-    (root / "constants.py").write_text(code)
+    (root / "constants.py").write_text(_add_generated_file_header(code))

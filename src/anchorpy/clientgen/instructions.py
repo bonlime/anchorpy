@@ -26,6 +26,7 @@ from anchorpy.clientgen.genpy import (
 from pyheck import shouty_snake, snake, upper_camel
 
 from anchorpy.clientgen.common import (
+    _add_generated_file_header,
     _bytes_literal,
     _field_from_decoded,
     _field_to_encodable,
@@ -65,13 +66,13 @@ def gen_instructions(idl: Idl, root: Path, gen_pdas: bool) -> None:
     gen_index_file(idl, instructions_dir)
     instructions = gen_instructions_code(idl, instructions_dir, gen_pdas)
     for path, code in instructions.items():
-        path.write_text(code)
+        path.write_text(_add_generated_file_header(code))
 
 
 def gen_index_file(idl: Idl, instructions_dir: Path) -> None:
     code = gen_index_code(idl)
     path = instructions_dir / "__init__.py"
-    path.write_text(code)
+    path.write_text(_add_generated_file_header(code))
 
 
 def gen_index_code(idl: Idl) -> str:
@@ -119,13 +120,6 @@ def _args_class_name(ix_name: str) -> str:
 
 def _accounts_interface_name(ix_name: str) -> str:
     return f"{upper_camel(ix_name)}Accounts"
-
-
-def _instruction_discriminator(ix, ix_name_snake: str) -> str:
-    discriminator = getattr(ix, "discriminator", None)
-    if discriminator is not None:
-        return _bytes_literal(discriminator)
-    return repr(_sighash(ix_name_snake))
 
 
 def _collect_defined_type_modules(ty) -> set[str]:
@@ -312,9 +306,7 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
         ix_name_snake_unsanitized = snake(ix.name)
         ix_name = _sanitize(ix_name_snake_unsanitized)
         args_class_name = _args_class_name(ix_name_snake_unsanitized)
-        discriminator_literal = _instruction_discriminator(
-            ix, ix_name_snake_unsanitized
-        )
+        discriminator_literal = _bytes_literal(_sighash(ix_name_snake_unsanitized))
         filename = (out / ix_name).with_suffix(".py")
         args_interface_params: list[TypedParam] = []
         layout_items: list[str] = []
