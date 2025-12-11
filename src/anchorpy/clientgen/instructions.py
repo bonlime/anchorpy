@@ -99,7 +99,9 @@ def gen_index_code(idl: Idl) -> str:
         union_members = " | \n    ".join(
             f"{instruction}" for instruction in instruction_classes
         )
-        sections.append(f"{instruction_type_alias} = (\n    {union_members}\n)")
+        sections.append(
+            f"{instruction_type_alias}: TypeAlias = (\n    {union_members}\n)"
+        )
         sections.append(
             f"{instruction_type_alias_cls}: TypeAlias = type[{instruction_type_alias}]"
         )
