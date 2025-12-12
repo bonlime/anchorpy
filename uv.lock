@@ -81,7 +81,7 @@ dev = [
 [[package]]
 name = "anchorpy-idl"
 version = "0.1.0"
-source = { git = "https://github.com/bonlime/anchorpy-idl.git?rev=fix-init#89b2ec06fb976ca873bc9a0e28fc902d44c75505" }
+source = { git = "https://github.com/bonlime/anchorpy-idl.git?rev=fix-init#2366eaf97d2c74aeb91f8fd09f6bf39fb45fe000" }
 dependencies = [
     { name = "jsonalias" },
 ]
