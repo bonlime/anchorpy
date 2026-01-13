@@ -580,7 +580,7 @@ def _field_from_json(
     ty_type = ty.ty
     ty_name_snake_unsanitized = snake(ty.name)
     ty_name = _sanitize(ty_name_snake_unsanitized)
-    var_name = f"{param_prefix}{ty_name_snake_unsanitized}{param_suffix}"
+    var_name = f"{param_prefix}{ty_name}{param_suffix}"
     if ty_type == IdlTypeSimple.Pubkey:
         return f"Pubkey.from_string({var_name})"
     if isinstance(ty_type, IdlTypeVec):
