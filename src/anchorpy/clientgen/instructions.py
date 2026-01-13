@@ -29,7 +29,11 @@ from anchorpy.clientgen.common import (
     _add_generated_file_header,
     _bytes_literal,
     _field_from_decoded,
+    _field_from_json,
     _field_to_encodable,
+    _field_to_json,
+    _idl_type_to_json_type,
+    _json_interface_name,
     _layout_for_type,
     _py_type_from_idl,
     _sanitize,
@@ -83,15 +87,17 @@ def gen_index_code(idl: Idl) -> str:
     for ix in idl.instructions:
         ix_name_snake_unsanitized = snake(ix.name)
         ix_name = _sanitize(ix_name_snake_unsanitized)
+        args_class_name = _args_class_name(ix_name_snake_unsanitized)
         import_members: list[str] = [
             ix_name,
-            _args_class_name(ix_name_snake_unsanitized),
+            args_class_name,
+            _json_interface_name(args_class_name),
         ]
         if ix.accounts:
             import_members.append(_accounts_interface_name(ix_name_snake_unsanitized))
         if import_members:
             imports.append(FromImport(f".{ix_name}", import_members))
-        instruction_classes.append(_args_class_name(ix_name_snake_unsanitized))
+        instruction_classes.append(args_class_name)
     sections = [str(Collection(imports))]
     if instruction_classes:
         instruction_type_alias = f"{program_name}Instructions"
@@ -311,9 +317,12 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
         discriminator_literal = _bytes_literal(_sighash(ix_name_snake_unsanitized))
         filename = (out / ix_name).with_suffix(".py")
         args_interface_params: list[TypedParam] = []
+        json_interface_params: list[TypedParam] = []
         layout_items: list[str] = []
         encoded_args_entries: list[StrDictEntry] = []
         from_decoded_entries: list[NamedArg] = []
+        to_json_entries: list[StrDictEntry] = []
+        from_json_entries: list[NamedArg] = []
         accounts_interface_name = _accounts_interface_name(ix_name_snake_unsanitized)
         for arg in ix.args:
             arg_name = _sanitize(snake(arg.name))
@@ -326,6 +335,12 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                         types_relative_imports=True,
                         use_fields_interface_for_struct=False,
                     ),
+                )
+            )
+            json_interface_params.append(
+                TypedParam(
+                    arg_name,
+                    _idl_type_to_json_type(ty=arg.ty, types_relative_imports=True),
                 )
             )
             layout_items.append(
@@ -356,6 +371,17 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                     ),
                 )
             )
+            to_json_entries.append(
+                StrDictEntry(arg_name, _field_to_json(idl, arg, "self."))
+            )
+            from_json_entries.append(
+                NamedArg(
+                    arg_name,
+                    _field_from_json(idl=idl, ty=arg, types_relative_imports=True),
+                )
+            )
+        json_interface_name = _json_interface_name(args_class_name)
+        json_interface = TypedDict(json_interface_name, json_interface_params)
         layout_val = (
             f"borsh.CStruct({','.join(layout_items)}).compile()" if ix.args else "None"
         )
@@ -384,6 +410,10 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
         from_decoded_body = (
             Call("cls", from_decoded_entries) if from_decoded_entries else "cls()"
         )
+        to_json_body = StrDict(to_json_entries) if to_json_entries else StrDict([])
+        from_json_body = (
+            Call("cls", from_json_entries) if from_json_entries else "cls()"
+        )
         args_dataclass = Class(
             args_class_name,
             ["InstructionData"],
@@ -408,6 +438,13 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                     [],
                     Return(to_encodable_body),
                     "dict[str, typing.Any]",
+                ),
+                Method("to_json", [], Return(to_json_body), json_interface_name),
+                ClassMethod(
+                    "from_json",
+                    [TypedParam("obj", json_interface_name)],
+                    Return(from_json_body),
+                    f'"{args_class_name}"',
                 ),
             ],
         )
@@ -442,6 +479,7 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
             [
                 *imports_base,
                 *type_imports,
+                json_interface,
                 args_dataclass,
                 *const_pdas,
                 *accounts,
