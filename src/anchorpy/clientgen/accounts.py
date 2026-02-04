@@ -204,13 +204,13 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
                 Return("cls.decode(bytes_data)"),
             ]
         ),
-        f'"{name}" | None',
+        f'{name} | None',
         is_async=True,
     )
     account_does_not_belong_raise = Raise(
         'ValueError("Account does not belong to this program")'
     )
-    fetch_multiple_return_type = f'list["{name}" | None]'
+    fetch_multiple_return_type = f'list[{name} | None]'
     fetch_multiple_method = ClassMethod(
         "fetch_multiple",
         [
@@ -249,7 +249,7 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
                 Return("res"),
             ]
         ),
-        f'list["{name}" | None]',
+        f'list[{name} | None]',
         is_async=True,
     )
     decode_body_end = Call("cls", decode_body_entries)
@@ -271,7 +271,7 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
                 Return(decode_body_end),
             ]
         ),
-        f'"{name}"',
+        name,
     )
     to_json_body = StrDict(to_json_entries)
     to_json_method = Method("to_json", [], Return(to_json_body), json_interface_name)
@@ -280,7 +280,7 @@ def gen_account_code(acc: IdlTypeDef, idl: Idl) -> str:
         "from_json",
         [TypedParam("obj", json_interface_name)],
         Return(from_json_body),
-        f'"{name}"',
+        name,
     )
     klass = Dataclass(
         name,

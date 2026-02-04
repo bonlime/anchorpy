@@ -425,13 +425,13 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                     "decode",
                     [TypedParam("data", "bytes")],
                     Return("super().decode(data)"),
-                    f'"{args_class_name}"',
+                    args_class_name,
                 ),
                 ClassMethod(
                     "from_decoded",
                     [TypedParam("obj", "Container")],
                     Return(from_decoded_body),
-                    f'"{args_class_name}"',
+                    args_class_name,
                 ),
                 Method(
                     "to_encodable",
@@ -444,7 +444,7 @@ def gen_instructions_code(idl: Idl, out: Path, gen_pdas: bool) -> dict[Path, str
                     "from_json",
                     [TypedParam("obj", json_interface_name)],
                     Return(from_json_body),
-                    f'"{args_class_name}"',
+                    args_class_name,
                 ),
             ],
         )

@@ -381,7 +381,7 @@ def gen_struct(
                 "decode",
                 [TypedParam("data", "bytes")],
                 Return("super().decode(data)"),
-                f'"{name}"',
+                name,
             )
         ]
         if base_class
@@ -396,7 +396,7 @@ def gen_struct(
             "from_decoded",
             [TypedParam("obj", "Container")],
             Return(f"cls({args_for_from_decoded})"),
-            f'"{name}"',
+            name,
         ),
         Method(
             "to_encodable",
@@ -409,7 +409,7 @@ def gen_struct(
             "from_json",
             [TypedParam("obj", json_interface_name)],
             Return(f"cls({args_for_from_json})"),
-            f'"{name}"',
+            name,
         ),
     ]
     if base_class:
