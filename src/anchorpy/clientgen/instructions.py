@@ -84,6 +84,7 @@ def gen_index_code(idl: Idl) -> str:
     program_name_raw = getattr(idl.metadata, "name", getattr(idl, "name", "Program"))
     program_name = _sanitize(upper_camel(program_name_raw))
     instruction_classes: list[str] = []
+    all_names: list[str] = []
     for ix in idl.instructions:
         ix_name_snake_unsanitized = snake(ix.name)
         ix_name = _sanitize(ix_name_snake_unsanitized)
@@ -97,6 +98,7 @@ def gen_index_code(idl: Idl) -> str:
             import_members.append(_accounts_interface_name(ix_name_snake_unsanitized))
         if import_members:
             imports.append(FromImport(f".{ix_name}", import_members))
+            all_names.extend(import_members)
         instruction_classes.append(args_class_name)
     sections = [str(Collection(imports))]
     if instruction_classes:
@@ -119,6 +121,12 @@ def gen_index_code(idl: Idl) -> str:
             f"INSTRUCTION_MAP: dict[bytes, {instruction_type_alias_cls}] = "
             "{instr.discriminator: instr for instr in instructions}"
         )
+        all_names.extend(
+            [instruction_type_alias, instruction_type_alias_cls, "instructions", "INSTRUCTION_MAP"]
+        )
+    if all_names:
+        all_names_str = ",\n    ".join(f'"{name}"' for name in all_names)
+        sections.insert(1, f"__all__ = [\n    {all_names_str},\n]")
     return "\n\n".join(sections)
 
 

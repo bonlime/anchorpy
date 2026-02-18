@@ -70,6 +70,7 @@ def gen_index_file(idl: Idl, accounts_dir: Path) -> None:
 
 def gen_index_code(idl: Idl) -> str:
     imports: list[FromImport] = []
+    all_names: list[str] = []
     for acc in idl.accounts:
         acc_name = _sanitize(acc.name)
         members = [
@@ -78,7 +79,12 @@ def gen_index_code(idl: Idl) -> str:
         ]
         module_name = _sanitize(snake(acc.name))
         imports.append(FromImport(f".{module_name}", members))
-    return str(Collection(imports))
+        all_names.extend(members)
+    sections = [str(Collection(imports))]
+    if all_names:
+        all_names_str = ",\n    ".join(f'"{name}"' for name in all_names)
+        sections.insert(1, f"__all__ = [\n    {all_names_str},\n]")
+    return "\n\n".join(sections)
 
 
 def gen_accounts_code(idl: Idl, accounts_dir: Path) -> dict[Path, str]:

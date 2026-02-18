@@ -164,7 +164,9 @@ def gen_index_code(
     program_name = _sanitize(upper_camel(program_name_raw))
     account_types: list[str] = []
     event_types: list[str] = []
-    imports.append(FromImport(".", [_sanitize(snake(ty.name)) for ty in idl.types]))
+    module_names = [_sanitize(snake(ty.name)) for ty in idl.types]
+    imports.append(FromImport(".", module_names))
+    all_names: list[str] = list(module_names)
     for ty in idl.types:
         ty_type = ty.ty
         module_name = _sanitize(snake(ty.name))
@@ -183,6 +185,7 @@ def gen_index_code(
                 import_members,
             )
         )
+        all_names.extend(import_members)
         sanitized_name = _sanitize(ty.name)
         if sanitized_name in account_discriminators:
             account_types.append(sanitized_name)
@@ -209,6 +212,9 @@ def gen_index_code(
             f"ACCOUNT_MAP: dict[bytes, {account_type_alias_cls}] = "
             "{acc.discriminator: acc for acc in accounts}"
         )
+        all_names.extend(
+            [account_type_alias, account_type_alias_cls, "accounts", "ACCOUNT_MAP"]
+        )
     if event_types:
         event_type_alias = f"{program_name}Events"
         event_type_alias_cls = f"{program_name}EventsCls"
@@ -223,6 +229,12 @@ def gen_index_code(
             f"EVENT_MAP: dict[bytes, {event_type_alias_cls}] = "
             "{event.discriminator: event for event in events}"
         )
+        all_names.extend(
+            [event_type_alias, event_type_alias_cls, "events", "EVENT_MAP"]
+        )
+    if all_names:
+        all_names_str = ",\n    ".join(f'"{name}"' for name in all_names)
+        sections.insert(1, f"__all__ = [\n    {all_names_str},\n]")
     return "\n\n".join(sections)
 
 
